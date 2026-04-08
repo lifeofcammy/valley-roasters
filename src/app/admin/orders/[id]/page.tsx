@@ -5,11 +5,28 @@ import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ORDER_STATUS_COLORS, ORDER_STATUSES, type OrderStatus } from "@/lib/constants";
+import {
+  ORDER_STATUS_COLORS,
+  ORDER_STATUSES,
+  type OrderStatus,
+} from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
@@ -55,19 +72,19 @@ export default async function AdminOrderDetailPage({
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
-        <Link href="/admin/orders">
+      <div className="flex items-center gap-3 mb-6 sm:mb-8">
+        <Link href="/admin/orders" className="flex-shrink-0">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Button>
         </Link>
-        <div>
-          <h1 className="font-display text-3xl font-bold">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-3xl font-bold truncate">
             Order #{order.order_number}
           </h1>
-          <p className="text-muted-foreground">
-            {format(new Date(order.created_at), "MMMM d, yyyy 'at' h:mm a")}
+          <p className="text-sm text-muted-foreground truncate">
+            {format(new Date(order.created_at), "MMM d, yyyy 'at' h:mm a")}
           </p>
         </div>
       </div>
@@ -77,21 +94,13 @@ export default async function AdminOrderDetailPage({
           {/* Line Items */}
           <Card>
             <CardHeader>
-              <CardTitle>Order Items</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Order Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.order_items?.map((item: {
+              {/* Mobile card list */}
+              <div className="md:hidden space-y-3">
+                {order.order_items?.map(
+                  (item: {
                     id: string;
                     product_name: string;
                     size: string;
@@ -99,20 +108,70 @@ export default async function AdminOrderDetailPage({
                     unit_price_cents: number;
                     total_cents: number;
                   }) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.product_name}</TableCell>
-                      <TableCell>{item.size}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">
-                        ${(item.unit_price_cents / 100).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${(item.total_cents / 100).toFixed(2)}
-                      </TableCell>
+                    <div
+                      key={item.id}
+                      className="border rounded-md p-3 bg-muted/30"
+                    >
+                      <p className="font-medium">{item.product_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.size}
+                      </p>
+                      <div className="flex items-center justify-between mt-2 text-sm">
+                        <span className="text-muted-foreground">
+                          {item.quantity} &times; $
+                          {(item.unit_price_cents / 100).toFixed(2)}
+                        </span>
+                        <span className="font-semibold">
+                          ${(item.total_cents / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {order.order_items?.map(
+                      (item: {
+                        id: string;
+                        product_name: string;
+                        size: string;
+                        quantity: number;
+                        unit_price_cents: number;
+                        total_cents: number;
+                      }) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">
+                            {item.product_name}
+                          </TableCell>
+                          <TableCell>{item.size}</TableCell>
+                          <TableCell className="text-right">
+                            {item.quantity}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${(item.unit_price_cents / 100).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${(item.total_cents / 100).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
               <div className="border-t mt-4 pt-4 text-right">
                 <p className="text-lg font-bold">
                   Total: ${(order.total_cents / 100).toFixed(2)}
@@ -124,14 +183,14 @@ export default async function AdminOrderDetailPage({
           {/* Status Update */}
           <Card>
             <CardHeader>
-              <CardTitle>Update Order</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Update Order</CardTitle>
             </CardHeader>
             <CardContent>
               <form action={updateStatus} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Order Status</Label>
                   <Select name="status" defaultValue={order.status}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -152,7 +211,9 @@ export default async function AdminOrderDetailPage({
                     rows={3}
                   />
                 </div>
-                <Button type="submit">Update Order</Button>
+                <Button type="submit" className="w-full sm:w-auto">
+                  Update Order
+                </Button>
               </form>
             </CardContent>
           </Card>
@@ -162,14 +223,27 @@ export default async function AdminOrderDetailPage({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Customer</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Customer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="font-semibold">{profile?.company_name}</p>
-              <p className="text-sm text-muted-foreground">{profile?.full_name}</p>
-              <p className="text-sm text-muted-foreground">{profile?.email}</p>
+              <p className="font-semibold truncate">{profile?.company_name}</p>
+              <p className="text-sm text-muted-foreground truncate">
+                {profile?.full_name}
+              </p>
+              <p className="text-sm text-muted-foreground break-all">
+                <a href={`mailto:${profile?.email}`} className="hover:underline">
+                  {profile?.email}
+                </a>
+              </p>
               {profile?.company_phone && (
-                <p className="text-sm text-muted-foreground">{profile.company_phone}</p>
+                <p className="text-sm text-muted-foreground">
+                  <a
+                    href={`tel:${profile.company_phone}`}
+                    className="hover:underline"
+                  >
+                    {profile.company_phone}
+                  </a>
+                </p>
               )}
               <Link
                 href={`/admin/customers/${order.profile_id}`}
@@ -182,10 +256,10 @@ export default async function AdminOrderDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Status</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-sm text-muted-foreground">Order:</span>
                 <Badge
                   variant="secondary"
@@ -194,9 +268,13 @@ export default async function AdminOrderDetailPage({
                   {order.status}
                 </Badge>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <span className="text-sm text-muted-foreground">Payment:</span>
-                <Badge variant={order.payment_status === "paid" ? "default" : "secondary"}>
+                <Badge
+                  variant={
+                    order.payment_status === "paid" ? "default" : "secondary"
+                  }
+                >
                   {order.payment_status}
                 </Badge>
               </div>
