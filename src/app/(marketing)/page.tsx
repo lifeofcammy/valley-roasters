@@ -34,18 +34,6 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
         </div>
 
-        {/* "ROASTING NOW" live pulse indicator */}
-        <div className="absolute top-24 sm:top-28 left-1/2 -translate-x-1/2 z-10">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-            </span>
-            <span className="text-[11px] sm:text-xs uppercase tracking-[0.18em] text-white/90 font-semibold">
-              Roasting Now &middot; Gilbert, AZ
-            </span>
-          </div>
-        </div>
 
         {/* Content centered */}
         <div className="relative text-center px-4 sm:px-6 py-20 max-w-5xl">
@@ -98,22 +86,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="bg-primary text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-2 gap-6 sm:gap-8 text-center fade-up-on-scroll max-w-2xl mx-auto">
-            {[
-              { number: "100%", label: "Specialty Grade" },
-              { number: "48hr", label: "Roast to Ship" },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold">{stat.number}</p>
-                <p className="text-xs sm:text-sm text-white/70 mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Split Feature - Image + Text */}
       <section className="py-0">
