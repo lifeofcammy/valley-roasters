@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
@@ -49,7 +48,6 @@ export default async function AdminCustomerDetailPage({
       const priceCents = Math.round(parseFloat(value as string) * 100);
 
       if (isNaN(priceCents) || priceCents <= 0) {
-        // Remove custom pricing if empty/invalid
         await supabase
           .from("customer_pricing")
           .delete()
@@ -72,20 +70,28 @@ export default async function AdminCustomerDetailPage({
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
-        <Link href="/admin/customers">
+      <div className="flex items-start gap-3 mb-6 sm:mb-8 flex-wrap">
+        <Link href="/admin/customers" className="flex-shrink-0">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Button>
         </Link>
-        <div>
-          <h1 className="font-display text-3xl font-bold">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-xl sm:text-3xl font-bold truncate">
             {customer.company_name}
           </h1>
-          <p className="text-muted-foreground">{customer.full_name} &middot; {customer.email}</p>
+          <p className="text-sm text-muted-foreground truncate">
+            {customer.full_name} &middot;{" "}
+            <a href={`mailto:${customer.email}`} className="hover:underline">
+              {customer.email}
+            </a>
+          </p>
         </div>
-        <Badge variant={customer.is_approved ? "default" : "secondary"} className="ml-auto">
+        <Badge
+          variant={customer.is_approved ? "default" : "secondary"}
+          className="flex-shrink-0"
+        >
           {customer.is_approved ? "Approved" : "Pending"}
         </Badge>
       </div>
@@ -94,46 +100,58 @@ export default async function AdminCustomerDetailPage({
         {/* Custom Pricing */}
         <Card>
           <CardHeader>
-            <CardTitle>Custom Pricing</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Custom Pricing</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={updatePricing} className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Base Price</TableHead>
-                    <TableHead>Custom Price ($/lb)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productsRes.data?.map((product) => {
-                    const custom = pricingMap.get(product.id);
-                    return (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          ${(product.base_price_cents / 100).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            name={`price_${product.id}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Use base"
-                            defaultValue={
-                              custom ? (custom.price_cents / 100).toFixed(2) : ""
-                            }
-                            className="w-28"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <Button type="submit">Save Pricing</Button>
+              <div className="space-y-3">
+                {productsRes.data?.map((product) => {
+                  const custom = pricingMap.get(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Base: ${(product.base_price_cents / 100).toFixed(2)}
+                          /lb
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Label
+                          htmlFor={`price_${product.id}`}
+                          className="sr-only"
+                        >
+                          Custom price for {product.name}
+                        </Label>
+                        <span className="text-sm text-muted-foreground">
+                          $
+                        </span>
+                        <Input
+                          id={`price_${product.id}`}
+                          name={`price_${product.id}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Base"
+                          defaultValue={
+                            custom
+                              ? (custom.price_cents / 100).toFixed(2)
+                              : ""
+                          }
+                          className="w-24"
+                          inputMode="decimal"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button type="submit" className="w-full sm:w-auto">
+                Save Pricing
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -141,7 +159,7 @@ export default async function AdminCustomerDetailPage({
         {/* Order History */}
         <Card>
           <CardHeader>
-            <CardTitle>Order History</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Order History</CardTitle>
           </CardHeader>
           <CardContent>
             {!ordersRes.data || ordersRes.data.length === 0 ? (
@@ -149,26 +167,30 @@ export default async function AdminCustomerDetailPage({
                 No orders yet.
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {ordersRes.data.map((order) => (
                   <Link
                     key={order.id}
                     href={`/admin/orders/${order.id}`}
-                    className="flex items-center justify-between p-3 rounded-md hover:bg-muted transition-colors"
+                    className="flex items-center justify-between gap-2 p-3 rounded-md hover:bg-muted transition-colors"
                   >
-                    <div>
-                      <p className="font-medium">#{order.order_number}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">
+                        #{order.order_number}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(order.created_at), "MMM d, yyyy")}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="font-medium">
                         ${(order.total_cents / 100).toFixed(2)}
                       </span>
                       <Badge
                         variant="secondary"
-                        className={ORDER_STATUS_COLORS[order.status as OrderStatus]}
+                        className={
+                          ORDER_STATUS_COLORS[order.status as OrderStatus]
+                        }
                       >
                         {order.status}
                       </Badge>
@@ -181,22 +203,42 @@ export default async function AdminCustomerDetailPage({
         </Card>
 
         {/* Customer Info */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Contact Info</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Contact Info</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="grid grid-cols-2 gap-2">
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-4 gap-y-2">
               <span className="text-muted-foreground">Company:</span>
-              <span>{customer.company_name}</span>
+              <span className="break-words">{customer.company_name}</span>
+
               <span className="text-muted-foreground">Contact:</span>
-              <span>{customer.full_name}</span>
+              <span className="break-words">{customer.full_name}</span>
+
               <span className="text-muted-foreground">Email:</span>
-              <span>{customer.email}</span>
+              <a
+                href={`mailto:${customer.email}`}
+                className="text-primary hover:underline break-all"
+              >
+                {customer.email}
+              </a>
+
               <span className="text-muted-foreground">Phone:</span>
-              <span>{customer.company_phone || "—"}</span>
-              <span className="text-muted-foreground">Address:</span>
               <span>
+                {customer.company_phone ? (
+                  <a
+                    href={`tel:${customer.company_phone}`}
+                    className="text-primary hover:underline"
+                  >
+                    {customer.company_phone}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </span>
+
+              <span className="text-muted-foreground">Address:</span>
+              <span className="break-words">
                 {[
                   customer.company_address_line1,
                   customer.company_city,
@@ -206,8 +248,11 @@ export default async function AdminCustomerDetailPage({
                   .filter(Boolean)
                   .join(", ") || "—"}
               </span>
+
               <span className="text-muted-foreground">Joined:</span>
-              <span>{format(new Date(customer.created_at), "MMM d, yyyy")}</span>
+              <span>
+                {format(new Date(customer.created_at), "MMM d, yyyy")}
+              </span>
             </div>
           </CardContent>
         </Card>
