@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { stripe } from "@/lib/stripe";
 
 interface CartItem {
   product_id: string;
@@ -26,7 +25,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No items provided" }, { status: 400 });
     }
 
-    // Get profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
@@ -60,30 +58,11 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate totals
     const subtotalCents = validatedItems.reduce(
       (sum, item) => sum + item.unit_price_cents * item.quantity,
       0
     );
-    const totalCents = subtotalCents; // Tax handled by Stripe or added later
 
-    // Create or get Stripe customer
-    let stripeCustomerId = profile.stripe_customer_id;
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: profile.email,
-        name: profile.company_name,
-        metadata: { supabase_user_id: user.id },
-      });
-      stripeCustomerId = customer.id;
-
-      await adminSupabase
-        .from("profiles")
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq("id", user.id);
-    }
-
-    // Create order in Supabase
     const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
@@ -91,8 +70,8 @@ export async function POST(request: Request) {
         status: "pending",
         subtotal_cents: subtotalCents,
         tax_cents: 0,
-        total_cents: totalCents,
-        payment_status: "unpaid",
+        total_cents: subtotalCents,
+        payment_status: "invoice_pending",
         shipping_address_line1: profile.company_address_line1,
         shipping_city: profile.company_city,
         shipping_state: profile.company_state,
@@ -105,7 +84,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
     }
 
-    // Create order items
     await adminSupabase.from("order_items").insert(
       validatedItems.map((item) => ({
         order_id: order.id,
@@ -118,37 +96,9 @@ export async function POST(request: Request) {
       }))
     );
 
-    // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      mode: "payment",
-      line_items: validatedItems.map((item) => ({
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: `${item.product_name} (${item.size})`,
-          },
-          unit_amount: item.unit_price_cents,
-        },
-        quantity: item.quantity,
-      })),
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/portal/orders?checkout=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/portal/reorder?checkout=cancelled`,
-      metadata: {
-        order_id: order.id,
-        supabase_user_id: user.id,
-      },
-    });
-
-    // Update order with Stripe session ID
-    await adminSupabase
-      .from("orders")
-      .update({ stripe_checkout_session_id: session.id })
-      .eq("id", order.id);
-
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ orderId: order.id });
   } catch (error) {
-    console.error("Checkout error:", error);
+    console.error("Order creation error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

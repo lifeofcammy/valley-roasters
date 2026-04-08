@@ -43,16 +43,13 @@ export default function ReorderPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setUserId(user.id);
 
-      // Load products with effective pricing
       const { data: prods } = await supabase
         .from("products")
         .select("*")
@@ -60,7 +57,6 @@ export default function ReorderPage() {
         .order("sort_order");
 
       if (prods) {
-        // Get customer-specific pricing
         const { data: pricing } = await supabase
           .from("customer_pricing")
           .select("product_id, price_cents");
@@ -75,7 +71,6 @@ export default function ReorderPage() {
         }));
         setProducts(productsWithPricing);
 
-        // If reordering from a previous order, pre-fill cart
         if (fromOrderId) {
           const { data: order } = await supabase
             .from("order_items")
@@ -89,7 +84,6 @@ export default function ReorderPage() {
                 product_name: item.product_name,
                 size: item.size,
                 quantity: item.quantity,
-                // Use current effective price, not old price
                 unit_price_cents:
                   pricingMap.get(item.product_id) ??
                   prods.find((p) => p.id === item.product_id)?.base_price_cents ??
@@ -137,15 +131,15 @@ export default function ReorderPage() {
     0
   );
 
-  async function handleCheckout() {
+  async function handlePlaceOrder() {
     if (cart.length === 0) {
       toast.error("Add items to your cart first.");
       return;
     }
 
-    setCheckingOut(true);
+    setPlacing(true);
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: cart }),
@@ -153,15 +147,17 @@ export default function ReorderPage() {
 
       const data = await res.json();
 
-      if (data.url) {
-        window.location.href = data.url;
+      if (res.ok && data.orderId) {
+        toast.success("Order placed — we'll be in touch to confirm.");
+        router.push(`/portal/orders/${data.orderId}?placed=true`);
       } else {
-        toast.error(data.error || "Checkout failed. Please try again.");
+        toast.error(data.error || "Could not place order. Please try again.");
+        setPlacing(false);
       }
     } catch {
       toast.error("Something went wrong. Please try again.");
+      setPlacing(false);
     }
-    setCheckingOut(false);
   }
 
   if (loading) {
@@ -186,7 +182,6 @@ export default function ReorderPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
           {cart.length === 0 ? (
             <Card>
@@ -259,7 +254,6 @@ export default function ReorderPage() {
             })
           )}
 
-          {/* Add Product */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -292,7 +286,6 @@ export default function ReorderPage() {
           </Card>
         </div>
 
-        {/* Order Summary */}
         <div>
           <Card className="sticky top-24">
             <CardHeader>
@@ -321,23 +314,23 @@ export default function ReorderPage() {
                   <span>${(subtotal / 100).toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Tax calculated at checkout
+                  We&apos;ll confirm pricing, shipping, and payment after you place your order.
                 </p>
               </div>
 
               <Button
                 className="w-full"
                 size="lg"
-                disabled={cart.length === 0 || checkingOut}
-                onClick={handleCheckout}
+                disabled={cart.length === 0 || placing}
+                onClick={handlePlaceOrder}
               >
-                {checkingOut ? (
+                {placing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    Placing...
                   </>
                 ) : (
-                  "Proceed to Checkout"
+                  "Place Order"
                 )}
               </Button>
             </CardContent>
