@@ -57,11 +57,6 @@ export default function AboutPage() {
                   cafes serve.
                 </p>
                 <p>
-                  We source our green coffee directly from producers across Ethiopia,
-                  Colombia, Guatemala, Kenya, Brazil, Indonesia, and beyond. Every lot
-                  is carefully cupped and evaluated before we commit to purchasing.
-                </p>
-                <p>
                   Our roasting approach is guided by the coffee itself. Each origin
                   has a unique story to tell, and our job is to develop roast profiles
                   that let those flavors shine.
