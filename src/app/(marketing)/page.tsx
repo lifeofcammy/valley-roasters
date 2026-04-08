@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { ArrowRight, Star, MapPin } from "lucide-react";
+import { ArrowRight, MapPin } from "lucide-react";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -102,9 +102,9 @@ export default async function HomePage() {
                 Sourced with Intention
               </h3>
               <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-                We build direct relationships with producers across Ethiopia, Colombia,
-                Guatemala, Kenya, and beyond. Every lot is cupped, scored, and selected
-                for exceptional quality before we commit to purchasing.
+                We build direct relationships with producers around the world.
+                Every lot is cupped, scored, and selected for exceptional quality
+                before we commit to purchasing.
               </p>
             </div>
           </div>
@@ -240,39 +240,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="relative py-24 sm:py-32 overflow-hidden">
-        <div className="absolute inset-0 bg-[#0c0705]">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-          >
-            <source src="/videos/coffee-pour.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
-        </div>
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center fade-up-on-scroll">
-          <div className="flex justify-center gap-1 mb-6 sm:mb-8">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="h-6 w-6 sm:h-7 sm:w-7 fill-primary text-primary" />
-            ))}
-          </div>
-          <blockquote>
-            <p className="font-display text-2xl sm:text-3xl lg:text-5xl font-medium text-white italic leading-snug">
-              &ldquo;Valley Specialty Roasters completely transformed our coffee program.
-              The quality is unmatched.&rdquo;
-            </p>
-            <footer className="mt-8 sm:mt-10">
-              <p className="font-semibold text-lg sm:text-xl text-white">Jackie Ludgate</p>
-              <p className="text-primary mt-1 font-medium text-sm sm:text-base">Top Cup Coffee House &middot; Gilbert, AZ</p>
-            </footer>
-          </blockquote>
-        </div>
-      </section>
 
       {/* CTA */}
       <section className="py-24 sm:py-28 bg-white">

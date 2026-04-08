@@ -92,7 +92,7 @@ export default function AboutPage() {
                 image: "https://images.unsplash.com/photo-1524350876685-274059332603?w=600&q=80",
                 title: "Ethical Sourcing",
                 description:
-                  "We pay premiums above market rate to our producers, investing in sustainable farming practices and long-term partnerships.",
+                  "We build long-term relationships with producers, investing in sustainable farming practices and quality at the source.",
                 delay: "fade-up-on-scroll",
               },
               {
@@ -106,7 +106,7 @@ export default function AboutPage() {
                 image: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=600&q=80",
                 title: "Partner Success",
                 description:
-                  "Your success is our success. We provide training resources, brewing guidance, and dedicated support.",
+                  "Your success is our success. We're a true partner — responsive, flexible, and invested in your business.",
                 delay: "fade-up-delay-2",
               },
             ].map((value) => (
