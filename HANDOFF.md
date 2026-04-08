@@ -1,236 +1,275 @@
-# Valley Specialty Roasters - Client Handoff Guide
+# Valley Specialty Roasters — Handoff Guide
 
-## What This Is
+A premium B2B wholesale coffee website with a public marketing site, a customer
+portal that reads order history live from Valley's Square account, and an admin
+dashboard for managing customers, orders, and content.
 
-This is the complete website for Valley Specialty Roasters — a premium B2B wholesale coffee ordering platform. It includes a public marketing website, a customer ordering portal with one-click reorder, payment processing (via Square — pending integration), and an admin dashboard for managing orders, customers, products, and custom pricing.
+**Live site:** https://valleyspecialtyroasters.com
 
 ---
 
 ## 📋 Companion Documents
 
-Before final launch, walk through these review documents with Jackie:
-
-- **[`VALLEY-REVIEW.md`](./VALLEY-REVIEW.md)** — Full copy review checklist.
-  Every line of text currently on the live site, with checkboxes and
-  blank lines for corrections. Walk through this with Valley Roasters
-  leadership to verify all marketing copy, product details, and
-  operational claims are accurate before launch.
-
+- **[`VALLEY-REVIEW.md`](./VALLEY-REVIEW.md)** — Full copy review checklist for
+  Jackie. Walk through every line of marketing copy on the live site and verify
+  it before final launch.
 - **[`SESSION-CONTINUE.md`](./SESSION-CONTINUE.md)** — Developer session
   context. Internal notes for whoever picks up the build next.
-
-- **[`AGENTS.md`](./AGENTS.md)** — Important note: this project uses a
-  newer version of Next.js with breaking changes from prior versions.
-
----
-
-## Accounts Valley Roasters Needs to Create
-
-Valley Roasters should own all accounts. Here's what to set up:
-
-### 1. Vercel (Website Hosting + Analytics)
-- **Sign up**: https://vercel.com/signup (use a company email)
-- **What it does**: Hosts the website, auto-deploys when code changes, provides analytics
-- **Enable Analytics**: Go to Project > Analytics > Enable (free tier available)
-- **Cost**: Free tier handles this site easily. Pro plan ($20/mo) adds more analytics.
-
-### 2. Supabase (Database + User Authentication)
-- **Sign up**: https://supabase.com/dashboard (use a company email)
-- **What it does**: Stores all customer data, orders, products, pricing, and handles user login/registration
-- **Create a project**: Name it "Valley Roasters", select region "US East"
-- **Cost**: Free tier supports up to 50,000 monthly active users — more than enough
-- **IMPORTANT**: After creating the project, you'll need to run the database migrations (6 SQL scripts provided below)
-
-### 3. Stripe (Payment Processing)
-- **Sign up**: https://dashboard.stripe.com/register (requires business info + bank account)
-- **What it does**: Processes all online payments from wholesale customers
-- **Cost**: 2.9% + $0.30 per transaction (industry standard, no monthly fee)
-- **Setup steps**:
-  1. Complete business verification
-  2. Get API keys from https://dashboard.stripe.com/apikeys
-  3. Set up webhook endpoint: `https://valleyspecialtyroasters.com/api/stripe/webhook`
-  4. Subscribe to events: `checkout.session.completed`, `payment_intent.payment_failed`, `charge.refunded`
-
-### 4. GitHub (Source Code - Optional)
-- **Current repo**: https://github.com/lifeofcammy/valley-roasters
-- **Option A**: Transfer repo to Valley Roasters' GitHub account
-- **Option B**: Keep it under developer's account and add Valley Roasters as collaborator
-- **What it does**: Stores all website code, Vercel auto-deploys from here
-
-### 5. GoDaddy (Domain - Already Owned)
-- **Domain**: valleyspecialtyroasters.com
-- **Action needed**: Point DNS to Vercel (instructions below)
+- **[`AGENTS.md`](./AGENTS.md)** — Important: this project uses Next.js 16
+  which has breaking changes from prior versions. Server Components cannot
+  pass component function references to client components.
 
 ---
 
-## Environment Variables
-
-After creating all accounts, set these in Vercel (Project > Settings > Environment Variables):
+## Architecture
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT_ID].supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=[from Supabase > Settings > API > anon public]
-SUPABASE_SERVICE_ROLE_KEY=[from Supabase > Settings > API > service_role — KEEP SECRET]
-STRIPE_SECRET_KEY=[from Stripe > Developers > API keys > Secret key]
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=[from Stripe > Developers > API keys > Publishable key]
-STRIPE_WEBHOOK_SECRET=[from Stripe > Developers > Webhooks > Signing secret]
+                  ┌────────────────────────────────┐
+                  │  valleyspecialtyroasters.com   │
+                  │           (Vercel)             │
+                  └────────┬───────────────────────┘
+                           │
+                ┌──────────┴────────────┐
+                │                       │
+                ▼                       ▼
+   ┌───────────────────┐   ┌───────────────────────┐
+   │  AUTH: Supabase   │   │  DATA: Square API     │
+   │  - Login/sessions │   │  - Order history      │
+   │  - Profiles table │   │  - Customer info      │
+   │  - Admin approval │   │  - Custom pricing     │
+   │  - Customer link  │──▶│  - (future) New orders│
+   │    to Square ID   │   │  - (future) Payments  │
+   └───────────────────┘   └───────────────────────┘
+                                       │
+                                       ▼
+                           ┌───────────────────────┐
+                           │  Square dashboard     │
+                           │  (Top Cup operates    │
+                           │  Valley as a location │
+                           │  here today — same    │
+                           │  workflow continues)  │
+                           └───────────────────────┘
+```
+
+**Key principle:** Square is the system of record. The website is a customer-
+facing portal that reads from Square (today) and will write back to Square
+(in a future session). Valley never has to maintain two systems.
+
+---
+
+## Accounts Valley Specialty Roasters owns
+
+All accounts are under `info@valleyspecialtyroasters.com`. Whoever holds that
+inbox holds the keys.
+
+### 1. Domain — GoDaddy
+- **Domain:** valleyspecialtyroasters.com (auto-renew on, expires 2028-04-21)
+- **DNS:** Points to Vercel (A records `216.198.79.1` and `64.29.17.1` on `@`
+  and `www`) plus Microsoft 365 mail records.
+
+### 2. Email — Microsoft 365 via GoDaddy
+- **Login:** https://email.godaddy.com
+- **Address:** info@valleyspecialtyroasters.com
+- **MFA:** Enabled (Microsoft Authenticator)
+
+### 3. Hosting — Vercel
+- **Login:** https://vercel.com/login
+- **Team:** "Valley Specialty Roaster's projects" (Hobby / free plan)
+- **Project name:** `valley-roasters`
+- Auto-deploys from the GitHub repo on every push to `master`.
+
+### 4. Database + Auth — Supabase
+- **Login:** https://supabase.com/dashboard
+- **Project name:** `valleyspecialtyroasters`
+- **Project ref:** `tkvlbowzkeudvomdfzzt`
+- **Region:** `us-west-1` (California)
+- **Plan:** Free tier (50K monthly active users)
+
+### 5. Payments + Orders — Square
+- **Provider:** Square (replaces the original Stripe plan)
+- **App:** Production access token already provisioned
+- **Application ID:** `sq0idp-D9ddWtjh6LJ4PutoqDhUjg`
+- **Location ID for Valley:** `LRA1MTWS2VGAM`
+- **Today the website only READS from Square** (order history, customer info).
+  Writing new orders + accepting payments through the website is the next
+  development phase — see "What's pending" below.
+
+### 6. Source Code — GitHub
+- **Repo:** https://github.com/lifeofcammy/valley-roasters (private)
+- **Owner:** Cam (will transfer or grant collaborator access at final handoff)
+
+---
+
+## Environment variables (set in Vercel)
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://tkvlbowzkeudvomdfzzt.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[from Supabase > Settings > API]
+SUPABASE_SERVICE_ROLE_KEY=[from Supabase > Settings > API — secret]
 NEXT_PUBLIC_SITE_URL=https://valleyspecialtyroasters.com
+
+SQUARE_ACCESS_TOKEN=[Square Developer dashboard — production token, secret]
+SQUARE_ENVIRONMENT=production
+SQUARE_LOCATION_ID=LRA1MTWS2VGAM
+NEXT_PUBLIC_SQUARE_APPLICATION_ID=sq0idp-D9ddWtjh6LJ4PutoqDhUjg
+NEXT_PUBLIC_SQUARE_LOCATION_ID=LRA1MTWS2VGAM
 ```
 
----
-
-## Database Setup (Supabase)
-
-After creating the Supabase project, go to SQL Editor and run these 6 migrations in order. The migrations create all tables, security policies, and helper functions.
-
-The migrations are stored in the GitHub repo and were already applied to the development database. For a fresh Supabase project, run them from the Supabase SQL Editor in this order:
-
-1. `create_profiles_table` — User profiles with company info
-2. `create_products_table` — Coffee product catalog
-3. `create_customer_pricing_table` — Per-customer price overrides
-4. `create_orders_tables` — Orders and order line items
-5. `create_rls_policies` — Row-level security (data isolation)
-6. `create_helper_functions` — Pricing calculation function
+All of the above are already set in Vercel's project environment.
 
 ---
 
-## How the Site Works
+## How the site works
 
-### Public Pages (No Login Required)
-- **Homepage** (`/`) — Hero with logo, value props, featured coffees, testimonial
-- **Wholesale** (`/wholesale`) — Full product catalog, FAQ, how-it-works
-- **About** (`/about`) — Company story, values, sourcing philosophy
-- **Contact** (`/contact`) — Contact form and info
+### Public pages (no login)
+- **`/`** — Homepage, hero, value props, current coffee selection, CTA
+- **`/wholesale`** — Full product catalog, FAQ, how-it-works
+- **`/about`** — Company story
+- **`/contact`** — Contact form (writes to `contact_messages` table)
 
-### Customer Flow
-1. **Register** (`/register`) — Customer fills out company info
+### Customer portal (login required)
+1. **Register** at `/register` — fills out company info
 2. **Admin approves** the account in the admin dashboard
-3. **Login** (`/login`) — Email/password or magic link
-4. **View Orders** (`/portal/orders`) — See all past orders with status
-5. **Reorder** — Click "Reorder" on any past order → cart pre-fills → checkout via Stripe
-6. **New Order** (`/portal/reorder`) — Browse products at custom pricing, build cart, checkout
+3. **Login** at `/login` — email/password or magic link
+4. **`/portal/orders`** — Order history. **For customers linked to a Square
+   customer record (`profiles.square_customer_id`), the page reads orders live
+   from Square.** Otherwise it reads from the Supabase `orders` table.
+5. **`/portal/orders/[id]`** — Single order detail (Square or Supabase)
+6. **`/portal/reorder`** — Browse products, build cart, place new order
+7. **`/portal/account`** — Account settings
 
-### Admin Flow
-1. **Dashboard** (`/admin`) — Overview with stats (orders, revenue, customers)
-2. **Orders** (`/admin/orders`) — View all orders, update status: pending → confirmed → roasting → shipped → delivered
-3. **Customers** (`/admin/customers`) — Approve/revoke accounts, set custom per-product pricing
-4. **Products** (`/admin/products`) — Add, edit, deactivate coffee products
+### Admin portal (login required, role = admin)
+1. **`/admin`** — Dashboard with stats and recent orders
+2. **`/admin/orders`** — All orders, status management
+3. **`/admin/messages`** — Contact form submissions
+4. **`/admin/customers`** — Approve/revoke customers, set custom pricing
+5. **`/admin/products`** — CRUD coffee catalog
 
-### Payment Flow
-```
-Customer places order → Stripe Checkout → Payment confirmed via webhook → Order auto-updates to "confirmed"
-```
-
----
-
-## Creating the First Admin Account
-
-1. Go to `/register` and create an account with Valley Roasters' email
-2. Go to Supabase Dashboard > SQL Editor
-3. Run:
-   ```sql
-   UPDATE public.profiles
-   SET role = 'admin', is_approved = true
-   WHERE email = 'admin@valleyspecialtyroasters.com';
-   ```
-4. Login at `/login` — the Admin Dashboard link appears in the sidebar
+### Login routing
+- Admins → `/admin`
+- Approved customers → `/portal/orders`
+- Unapproved customers → `/pending-approval`
+(Handled in middleware + login page; both are role-aware.)
 
 ---
 
-## Domain Setup (GoDaddy → Vercel)
+## Current accounts in Supabase
 
-1. In **Vercel**: Project Settings > Domains > Add `valleyspecialtyroasters.com`
-2. In **GoDaddy DNS settings**, add:
-   - **A Record**: `@` → `76.76.21.21`
-   - **CNAME Record**: `www` → `cname.vercel-dns.com`
-3. Vercel auto-provisions SSL certificate (HTTPS)
-4. Update `NEXT_PUBLIC_SITE_URL` env var to `https://valleyspecialtyroasters.com`
+### Admin
+- **Email:** `info@valleyspecialtyroasters.com`
+- **Role:** `admin`, `is_approved=true`
+- This is the account Jackie/Top Cup uses to log into both the Vercel and
+  Supabase dashboards as well as the website admin.
 
----
+### Beanchain Coffee — demo wholesaler (used for client walkthroughs)
+- **Email:** `beanchain.demo@valleyspecialtyroasters.com`
+- **Company:** Beanchain Coffee (David Baxter)
+- **Role:** `customer`, `is_approved=true`
+- **Linked to Square customer:** `WQSZ308EWEQ7WV03QS9PFK1PR0`
+- When you sign in as this account, the portal pulls David's **real order
+  history** from Square — every Brazil whole-bean order the cafe has placed
+  with Valley over the past months. This is the "look how it would work for a
+  real wholesaler" demo for Jackie's leadership team.
 
-## Analytics (Vercel)
-
-1. In Vercel Dashboard, go to your project
-2. Click **Analytics** tab
-3. Click **Enable** (free tier: 2,500 events/month, Pro: unlimited)
-4. Tracks: page views, unique visitors, top pages, referrers, countries, devices
-5. No code changes needed — Vercel Analytics is built into the hosting
-
-For more detailed analytics, consider adding Google Analytics (GA4) later.
-
----
-
-## Products (Pre-loaded)
-
-| Product | Origin | Roast | Base Price/lb |
-|---------|--------|-------|---------------|
-| Ethiopian Yirgacheffe | Ethiopia | Light | $14.95 |
-| Colombian Supremo | Colombia | Medium | $12.95 |
-| Guatemala Antigua | Guatemala | Medium-Dark | $13.95 |
-| Brazil Santos Natural | Brazil | Medium | $10.95 |
-| Sumatra Mandheling | Indonesia | Dark | $13.95 |
-| Valley House Blend | Blend | Medium | $11.95 |
-| Espresso Classico | Blend | Medium-Dark | $12.95 |
-| Kenya AA Nyeri | Kenya | Light | $16.95 |
-
-Editable from Admin > Products. These are base prices — each customer can have custom pricing set by the admin.
+The other 14 wholesalers visible in Square (Shaghf, 10:19, Crepe Club, etc.)
+have not yet been pre-created in Supabase — that's a fast batch task once
+Jackie greenlights it (~30 min).
 
 ---
 
-## Custom Pricing
+## What's live as of 2026-04-08
 
-Each customer can have unique per-product wholesale pricing:
-
-1. Admin > Customers > Click customer name
-2. "Custom Pricing" section shows all products
-3. Enter custom $/lb price (leave blank = use base price)
-4. Click "Save Pricing"
-5. Customer automatically sees their custom price when ordering
-
----
-
-## Tech Stack Reference
-
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Frontend | Next.js 15 | React framework, server rendering, SEO |
-| Styling | Tailwind CSS + shadcn/ui | Design system and components |
-| Hosting | Vercel | Deployment, CDN, analytics |
-| Database | Supabase (PostgreSQL) | Data storage with row-level security |
-| Auth | Supabase Auth | User registration, login, sessions |
-| Payments | Stripe Checkout | Secure payment processing |
-| Fonts | Playfair Display + Inter | Premium typography |
-| Source | GitHub | Version control |
+✅ Marketing site at https://valleyspecialtyroasters.com (home, about, wholesale,
+   contact)
+✅ SSL + custom domain via GoDaddy → Vercel
+✅ Customer registration + login (email/password and magic link)
+✅ Admin dashboard with role-based routing
+✅ Customer portal showing **real Square order history** for any customer
+   linked via `profiles.square_customer_id` (Beanchain is the demo)
+✅ Order detail pages reading from Square
+✅ Admin contact-message inbox
+✅ All Next.js 16 / React 19 server-component compatibility issues resolved
+   (cookies adapter, client/server icon serialization, missing "use client"
+   directives on base-ui wrappers)
 
 ---
 
-## SEO
+## What's pending — next development session
 
-Optimized for: "Wholesale Coffee", "Roasted Coffee", "Specialty Coffee Roaster", "Coffee Supplier"
+🛠 **Write new orders into Square** — When a customer places an order on
+  `/portal/reorder`, the order should be created in Square so it appears in
+  Top Cup's normal Square dashboard alongside in-store sales.
 
-Built-in:
-- JSON-LD structured data (Organization + FAQ schemas)
-- Dynamic sitemap at `/sitemap.xml`
-- `robots.txt` blocking portal/admin from search engines
-- Meta titles and descriptions on all pages
-- Mobile-responsive design
+🛠 **Square Web Payments SDK** — Embedded credit card widget on the checkout
+  page so customers can pay online. Funds settle into Valley's Square account.
+
+🛠 **Pull product catalog from Square** — Replace the 8 placeholder coffees
+  in the Supabase `products` table with Valley's real Square catalog so the
+  website always reflects what Valley actually sells, automatically.
+
+🛠 **Per-customer pricing from Square** — Square already holds Valley's custom
+  per-customer wholesale prices. Pull those into the order calculation rather
+  than maintaining them separately in Supabase.
+
+🛠 **Pre-create Supabase accounts for the 14 other wholesalers** — Same
+  pattern as Beanchain. Each gets a login that immediately shows their real
+  order history.
+
+🛠 **Email notifications** — Order confirmation, contact form forwarding,
+  password reset (Supabase Auth handles this; needs sender configured).
+
+🛠 **Real product photography** — Replace Unsplash placeholders with Valley's
+  own photos when Jackie sends them.
+
+🛠 **Square account decision** — The handoff doc notes Valley Specialty
+  Roasters LLC is a new legal entity but currently operates as a location
+  under Top Cup's Square merchant account (location `LRA1MTWS2VGAM`). Decide
+  whether Valley should have its own Square merchant account for cleaner
+  accounting and liability separation.
 
 ---
 
-## Brand Identity
+## Tech stack
 
-- **Primary Color**: Amber/Gold `#c8720c` (desert sunset from logo)
-- **Secondary Color**: Rich Coffee Brown `#1c1210`
-- **Background**: Warm White `#fefcf9`
-- **Fonts**: Playfair Display (headings) + Inter (body text)
-- **Logo**: Desert sunset coffee bean with cacti — `public/logo.png`
+| Layer        | Technology               | Purpose                            |
+|--------------|--------------------------|------------------------------------|
+| Frontend     | Next.js 16 (App Router)  | React framework, server rendering  |
+| UI           | Tailwind v4 + shadcn/ui  | Design system (base-ui, not Radix) |
+| Database     | Supabase (Postgres + RLS)| Auth, profiles, orders, products   |
+| Orders/POS   | Square API               | Live order history, customer data  |
+| Hosting      | Vercel                   | Deploys, CDN, analytics            |
+| Fonts        | Playfair Display + Inter | Premium typography                 |
+| Source       | GitHub                   | Version control                    |
 
 ---
 
-## Support & Maintenance
+## Brand identity
 
-- **Code changes**: Push to GitHub → Vercel auto-deploys in ~1 minute
-- **Database**: Supabase dashboard for data management
-- **Payments**: Stripe dashboard for viewing payments, issuing refunds
-- **Orders**: Admin dashboard at `/admin` for day-to-day operations
-- **Customer issues**: Admin can approve/revoke accounts, reset custom pricing
+- **Primary:** Amber/Gold `#c8720c` (desert sunset from logo)
+- **Secondary:** Rich Coffee Brown `#1c1210`
+- **Background:** Warm White `#fefcf9`
+- **Logo:** `public/logo.png` (desert sunset coffee bean with cacti)
+
+---
+
+## Day-to-day operations
+
+- **Code changes:** Push to GitHub → Vercel auto-deploys in ~1 minute
+- **Database admin:** Supabase dashboard for data management
+- **Order management (today):** Square dashboard (existing Top Cup workflow)
+- **Customer admin (website):** `/admin` for approving registrations and
+  managing portal-only state
+
+---
+
+## Recurring monthly costs
+
+| Item                 | Cost          |
+|----------------------|---------------|
+| Vercel hosting       | $0 (free tier)|
+| Supabase database    | $0 (free tier)|
+| GoDaddy domain       | ~$1.92/mo     |
+| Microsoft 365 email  | (current bill)|
+| Square (per-txn fees)| 2.6%+$0.10 in-person, 2.9%+$0.30 online |
+
+**~$2/month recurring** until usage exceeds the free tiers.
