@@ -29,12 +29,16 @@ export default function AccountPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, company_name, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, email")
+        .select(
+          "full_name, company_name, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, email"
+        )
         .eq("id", user.id)
         .single();
 
@@ -49,8 +53,13 @@ export default function AccountPage() {
     if (!profile) return;
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setSaving(false);
+      return;
+    }
 
     const { error } = await supabase
       .from("profiles")
@@ -88,38 +97,57 @@ export default function AccountPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold mb-8">Account Settings</h1>
+      <h1 className="font-display text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">
+        Account Settings
+      </h1>
 
       <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Contact Information
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Full Name</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <Input
+                  id="full_name"
+                  autoComplete="name"
                   value={profile.full_name}
                   onChange={(e) => updateField("full_name", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={profile.email} disabled className="bg-muted" />
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={profile.email}
+                  disabled
+                  className="bg-muted"
+                />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Company Name</Label>
+                <Label htmlFor="company_name">Company Name</Label>
                 <Input
+                  id="company_name"
+                  autoComplete="organization"
                   value={profile.company_name}
                   onChange={(e) => updateField("company_name", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
+                <Label htmlFor="company_phone">Phone</Label>
                 <Input
+                  id="company_phone"
+                  type="tel"
+                  autoComplete="tel"
+                  inputMode="tel"
                   value={profile.company_phone}
                   onChange={(e) => updateField("company_phone", e.target.value)}
                 />
@@ -130,41 +158,58 @@ export default function AccountPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Shipping Address</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Shipping Address
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Address Line 1</Label>
+              <Label htmlFor="address_line1">Address Line 1</Label>
               <Input
+                id="address_line1"
+                autoComplete="address-line1"
                 value={profile.company_address_line1}
-                onChange={(e) => updateField("company_address_line1", e.target.value)}
+                onChange={(e) =>
+                  updateField("company_address_line1", e.target.value)
+                }
               />
             </div>
             <div className="space-y-2">
-              <Label>Address Line 2</Label>
+              <Label htmlFor="address_line2">Address Line 2</Label>
               <Input
+                id="address_line2"
+                autoComplete="address-line2"
                 value={profile.company_address_line2}
-                onChange={(e) => updateField("company_address_line2", e.target.value)}
+                onChange={(e) =>
+                  updateField("company_address_line2", e.target.value)
+                }
               />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>City</Label>
+                <Label htmlFor="city">City</Label>
                 <Input
+                  id="city"
+                  autoComplete="address-level2"
                   value={profile.company_city}
                   onChange={(e) => updateField("company_city", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>State</Label>
+                <Label htmlFor="state">State</Label>
                 <Input
+                  id="state"
+                  autoComplete="address-level1"
                   value={profile.company_state}
                   onChange={(e) => updateField("company_state", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>ZIP</Label>
+                <Label htmlFor="zip">ZIP</Label>
                 <Input
+                  id="zip"
+                  autoComplete="postal-code"
+                  inputMode="numeric"
                   value={profile.company_zip}
                   onChange={(e) => updateField("company_zip", e.target.value)}
                 />
@@ -173,7 +218,7 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="w-full sm:w-auto">
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </form>
