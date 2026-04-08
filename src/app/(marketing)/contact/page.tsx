@@ -94,10 +94,10 @@ export default function ContactPage() {
                     <div>
                       <p className="font-medium">Email</p>
                       <a
-                        href="mailto:valleyspecialtyroasters@gmail.com"
+                        href="mailto:info@valleyspecialtyroasters.com"
                         className="text-muted-foreground hover:text-primary transition-colors"
                       >
-                        valleyspecialtyroasters@gmail.com
+                        info@valleyspecialtyroasters.com
                       </a>
                     </div>
                   </div>

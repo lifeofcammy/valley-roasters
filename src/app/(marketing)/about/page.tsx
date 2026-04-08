@@ -155,10 +155,10 @@ export default function AboutPage() {
               <div>
                 <p className="font-display text-lg font-semibold">Get in Touch</p>
                 <a
-                  href="mailto:valleyspecialtyroasters@gmail.com"
+                  href="mailto:info@valleyspecialtyroasters.com"
                   className="text-muted-foreground hover:text-primary transition-colors mt-1 inline-block"
                 >
-                  valleyspecialtyroasters@gmail.com
+                  info@valleyspecialtyroasters.com
                 </a>
               </div>
             </div>

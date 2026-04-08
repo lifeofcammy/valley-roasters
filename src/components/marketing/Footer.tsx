@@ -63,10 +63,10 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-secondary-foreground/50">
               <li>
                 <a
-                  href="mailto:valleyspecialtyroasters@gmail.com"
+                  href="mailto:info@valleyspecialtyroasters.com"
                   className="hover:text-primary transition-colors"
                 >
-                  valleyspecialtyroasters@gmail.com
+                  info@valleyspecialtyroasters.com
                 </a>
               </li>
               <li>
