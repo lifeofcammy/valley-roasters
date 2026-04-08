@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Mail, MapPin } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "About Us",
@@ -131,6 +131,37 @@ export default function AboutPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Visit Us */}
+      <section className="py-20 bg-muted/40">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="flex items-start gap-4">
+              <MapPin className="h-6 w-6 text-primary mt-1 shrink-0" />
+              <div>
+                <p className="font-display text-lg font-semibold">Visit the Roastery</p>
+                <p className="text-muted-foreground mt-1 leading-relaxed">
+                  7131 S Val Vista Dr, Suite 103
+                  <br />
+                  Gilbert, AZ 85298
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <Mail className="h-6 w-6 text-primary mt-1 shrink-0" />
+              <div>
+                <p className="font-display text-lg font-semibold">Get in Touch</p>
+                <a
+                  href="mailto:valleyspecialtyroasters@gmail.com"
+                  className="text-muted-foreground hover:text-primary transition-colors mt-1 inline-block"
+                >
+                  valleyspecialtyroasters@gmail.com
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

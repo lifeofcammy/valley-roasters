@@ -63,13 +63,17 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-secondary-foreground/50">
               <li>
                 <a
-                  href="mailto:info@valleyspecialtyroasters.com"
+                  href="mailto:valleyspecialtyroasters@gmail.com"
                   className="hover:text-primary transition-colors"
                 >
-                  info@valleyspecialtyroasters.com
+                  valleyspecialtyroasters@gmail.com
                 </a>
               </li>
-              <li>Gilbert, Arizona</li>
+              <li>
+                7131 S Val Vista Dr, Suite 103
+                <br />
+                Gilbert, AZ 85298
+              </li>
             </ul>
           </div>
         </div>
