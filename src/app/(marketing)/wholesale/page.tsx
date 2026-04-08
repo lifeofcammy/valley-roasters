@@ -123,7 +123,7 @@ export default async function WholesalePage() {
                 </Button>
               </Link>
               <Link href="/contact" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="btn-lift w-full sm:w-auto border-white/20 text-white hover:bg-white/10 text-base sm:text-lg px-8 py-6 font-semibold">
+                <Button size="lg" variant="outline" className="btn-lift w-full sm:w-auto bg-transparent border-2 border-white/40 text-white hover:bg-white/15 hover:border-white/70 hover:text-white text-base sm:text-lg px-8 py-6 font-semibold backdrop-blur-sm">
                   Contact Us
                 </Button>
               </Link>
