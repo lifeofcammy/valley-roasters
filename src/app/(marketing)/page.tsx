@@ -101,10 +101,8 @@ export default async function HomePage() {
       {/* Stats Bar */}
       <section className="bg-primary text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center fade-up-on-scroll">
+          <div className="grid grid-cols-2 gap-6 sm:gap-8 text-center fade-up-on-scroll max-w-2xl mx-auto">
             {[
-              { number: "8+", label: "Single Origins" },
-              { number: "15+", label: "Wholesale Partners" },
               { number: "100%", label: "Specialty Grade" },
               { number: "48hr", label: "Roast to Ship" },
             ].map((stat) => (
