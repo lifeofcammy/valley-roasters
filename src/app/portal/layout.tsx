@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Package, RotateCcw, Settings } from "lucide-react";
 import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
 
 const portalLinks: MobileNavLink[] = [
-  { href: "/portal/orders", label: "Orders", icon: Package },
-  { href: "/portal/reorder", label: "New Order", icon: RotateCcw },
-  { href: "/portal/account", label: "Account", icon: Settings },
+  { href: "/portal/orders", label: "Orders", icon: "orders" },
+  { href: "/portal/reorder", label: "New Order", icon: "reorder" },
+  { href: "/portal/account", label: "Account", icon: "settings" },
 ];
 
 export default async function PortalLayout({
@@ -32,7 +31,7 @@ export default async function PortalLayout({
     links.push({
       href: "/admin",
       label: "Admin Dashboard",
-      icon: Settings,
+      icon: "settings",
       variant: "accent",
     });
   }

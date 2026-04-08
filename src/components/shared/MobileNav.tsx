@@ -1,15 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, LogOut, type LucideIcon } from "lucide-react";
+import {
+  Menu,
+  X,
+  LogOut,
+  LayoutDashboard,
+  Package,
+  Mail,
+  Users,
+  Coffee,
+  ArrowLeft,
+  RotateCcw,
+  Settings,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+/**
+ * Icon names that can be passed from Server Components → MobileNav.
+ * We can't pass `LucideIcon` component references across the server/
+ * client boundary (React 19 + Next 16 serialization), so layouts pass
+ * strings and we resolve them here.
+ */
+export type NavIconName =
+  | "dashboard"
+  | "orders"
+  | "messages"
+  | "customers"
+  | "products"
+  | "back"
+  | "reorder"
+  | "settings";
+
+const NAV_ICONS: Record<NavIconName, ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  orders: Package,
+  messages: Mail,
+  customers: Users,
+  products: Coffee,
+  back: ArrowLeft,
+  reorder: RotateCcw,
+  settings: Settings,
+};
 
 export interface MobileNavLink {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIconName;
   variant?: "default" | "accent" | "muted";
 }
 
@@ -21,14 +60,14 @@ interface MobileNavProps {
   extraLink?: {
     href: string;
     label: string;
-    icon: LucideIcon;
+    icon: NavIconName;
   };
 }
 
 /**
  * Responsive nav for admin & portal layouts.
  * - On mobile (<sm): sticky top header with hamburger; drawer slides in from the left.
- * - On sm+: full-height left sidebar (same look as before).
+ * - On sm+: full-height left sidebar.
  */
 export function MobileNav({
   primaryLabel,
@@ -74,7 +113,7 @@ export function MobileNav({
       </div>
       <nav className="p-2 space-y-1 flex-1">
         {links.map((link) => {
-          const Icon = link.icon;
+          const Icon = NAV_ICONS[link.icon] ?? Package;
           const isAccent = link.variant === "accent";
           return (
             <Link
@@ -100,7 +139,10 @@ export function MobileNav({
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 px-3 py-3 min-h-11 text-sm text-background/50 hover:text-background hover:bg-background/10 rounded-md transition-colors"
             >
-              <extraLink.icon className="h-4 w-4 flex-shrink-0" />
+              {(() => {
+                const ExtraIcon = NAV_ICONS[extraLink.icon] ?? ArrowLeft;
+                return <ExtraIcon className="h-4 w-4 flex-shrink-0" />;
+              })()}
               <span className="truncate">{extraLink.label}</span>
             </Link>
           </>

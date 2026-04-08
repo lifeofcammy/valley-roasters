@@ -1,21 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import {
-  LayoutDashboard,
-  Package,
-  Users,
-  Coffee,
-  Mail,
-  ArrowLeft,
-} from "lucide-react";
 import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
 
 const adminLinks: MobileNavLink[] = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/orders", label: "Orders", icon: Package },
-  { href: "/admin/messages", label: "Messages", icon: Mail },
-  { href: "/admin/customers", label: "Customers", icon: Users },
-  { href: "/admin/products", label: "Products", icon: Coffee },
+  { href: "/admin", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin/orders", label: "Orders", icon: "orders" },
+  { href: "/admin/messages", label: "Messages", icon: "messages" },
+  { href: "/admin/customers", label: "Customers", icon: "customers" },
+  { href: "/admin/products", label: "Products", icon: "products" },
 ];
 
 export default async function AdminLayout({
@@ -47,7 +39,7 @@ export default async function AdminLayout({
         extraLink={{
           href: "/portal/orders",
           label: "Customer Portal",
-          icon: ArrowLeft,
+          icon: "back",
         }}
       />
 
