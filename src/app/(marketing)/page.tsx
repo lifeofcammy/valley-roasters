@@ -15,19 +15,36 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* HERO - Logo-centered, dramatic, Ken Burns background */}
+      {/* HERO - Logo-centered, cinematic video background */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background - dark roasted beans with slow Ken Burns motion */}
+        {/* Background - looping espresso pour video for cinematic motion */}
         <div className="absolute inset-0 bg-[#0c0705]">
-          <Image
-            src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=1920&q=85"
-            alt="Coffee art"
-            fill
-            className="object-cover opacity-30 animate-ken-burns"
-            priority
-          />
-          {/* Vignette overlay for depth */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            className="absolute inset-0 w-full h-full object-cover opacity-45"
+          >
+            <source src="/videos/hero-espresso.mp4" type="video/mp4" />
+          </video>
+          {/* Vignette overlay for depth + text legibility */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
+        </div>
+
+        {/* "ROASTING NOW" live pulse indicator */}
+        <div className="absolute top-24 sm:top-28 left-1/2 -translate-x-1/2 z-10">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+            </span>
+            <span className="text-[11px] sm:text-xs uppercase tracking-[0.18em] text-white/90 font-semibold">
+              Roasting Now &middot; Gilbert, AZ
+            </span>
+          </div>
         </div>
 
         {/* Content centered */}
@@ -141,13 +158,17 @@ export default async function HomePage() {
               </p>
             </div>
           </div>
-          <div className="relative order-1 lg:order-2 min-h-[280px] lg:min-h-0">
-            <Image
-              src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=960&q=80"
-              alt="Coffee roasting process"
-              fill
-              className="object-cover animate-ken-burns"
-            />
+          <div className="relative order-1 lg:order-2 min-h-[280px] lg:min-h-0 bg-[#0c0705]">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              className="absolute inset-0 w-full h-full object-cover"
+            >
+              <source src="/videos/coffee-brewing.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
 
@@ -256,13 +277,17 @@ export default async function HomePage() {
       {/* Testimonial */}
       <section className="relative py-24 sm:py-32 overflow-hidden">
         <div className="absolute inset-0 bg-[#0c0705]">
-          <Image
-            src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1920&q=80"
-            alt="Barista at work"
-            fill
-            className="object-cover opacity-25 animate-ken-burns"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
+          >
+            <source src="/videos/coffee-pour.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
         </div>
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center fade-up-on-scroll">
           <div className="flex justify-center gap-1 mb-6 sm:mb-8">
