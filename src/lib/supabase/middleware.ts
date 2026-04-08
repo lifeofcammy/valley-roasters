@@ -78,11 +78,23 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Auth pages - redirect if already logged in
+  // Auth pages - redirect if already logged in (role-aware)
   if (pathname === "/login" || pathname === "/register") {
     if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, is_approved")
+        .eq("id", user.id)
+        .single();
+
       const url = request.nextUrl.clone();
-      url.pathname = "/portal/orders";
+      if (profile?.role === "admin") {
+        url.pathname = "/admin";
+      } else if (profile && !profile.is_approved) {
+        url.pathname = "/pending-approval";
+      } else {
+        url.pathname = "/portal/orders";
+      }
       return NextResponse.redirect(url);
     }
   }

@@ -39,14 +39,28 @@ export default function LoginPage() {
         setMessage("Check your email for a login link.");
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) {
         setError(error.message);
       } else {
-        router.push("/portal/orders");
+        // Route based on role: admins go to /admin, everyone else to /portal
+        let destination = "/portal/orders";
+        if (data.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role, is_approved")
+            .eq("id", data.user.id)
+            .single();
+          if (profile?.role === "admin") {
+            destination = "/admin";
+          } else if (profile && !profile.is_approved) {
+            destination = "/pending-approval";
+          }
+        }
+        router.push(destination);
         router.refresh();
       }
     }
