@@ -103,8 +103,135 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+  }
+}
+
+/* ==========================================================
+   PREMIUM MOTION UTILITIES
+   Pure CSS, zero JavaScript, zero dependencies.
+   Added for the Valley Roasters launch.
+   ========================================================== */
+
+/* --- 1. Ken Burns slow zoom/pan on hero imagery --- */
+@keyframes kenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.15) translate(-2%, -1.5%);
+  }
+}
+
+.animate-ken-burns {
+  animation: kenBurns 22s ease-out infinite alternate;
+  will-change: transform;
+}
+
+/* --- 2. Scroll-triggered fade-up reveals ---
+   Uses modern scroll-driven animations (Chrome/Edge 115+, Safari 26+).
+   Graceful fallback for older browsers below. */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up-on-scroll {
+  animation: fadeUp linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 35%;
+}
+
+/* Slight stagger variants for grouped elements */
+.fade-up-delay-1 {
+  animation: fadeUp linear both;
+  animation-timeline: view();
+  animation-range: entry 5% entry 40%;
+}
+.fade-up-delay-2 {
+  animation: fadeUp linear both;
+  animation-timeline: view();
+  animation-range: entry 10% entry 45%;
+}
+.fade-up-delay-3 {
+  animation: fadeUp linear both;
+  animation-timeline: view();
+  animation-range: entry 15% entry 50%;
+}
+
+/* Older-browser fallback: just show everything normally */
+@supports not (animation-timeline: view()) {
+  .fade-up-on-scroll,
+  .fade-up-delay-1,
+  .fade-up-delay-2,
+  .fade-up-delay-3 {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* --- 3. Parallax backgrounds (desktop only — iOS has bugs) --- */
+@media (min-width: 768px) {
+  .parallax-bg {
+    background-attachment: fixed;
+    background-size: cover;
+    background-position: center;
+  }
+}
+
+/* --- 4. Subtle button lift on hover --- */
+.btn-lift {
+  transition: transform 280ms ease, box-shadow 280ms ease;
+}
+.btn-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* --- 5. Image zoom on card hover (used with .group parent) --- */
+.img-hover-zoom {
+  transition: transform 900ms ease;
+}
+
+/* --- 6. Text shimmer for emphasis (subtle gradient) --- */
+@keyframes textShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.text-shimmer {
+  background: linear-gradient(90deg, var(--primary) 0%, var(--warm) 50%, var(--primary) 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 6s ease-in-out infinite;
+}
+
+/* --- 7. Respect user motion preferences --- */
+@media (prefers-reduced-motion: reduce) {
+  .animate-ken-burns,
+  .fade-up-on-scroll,
+  .fade-up-delay-1,
+  .fade-up-delay-2,
+  .fade-up-delay-3,
+  .img-hover-zoom,
+  .text-shimmer {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    background: initial !important;
+    -webkit-text-fill-color: initial !important;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }

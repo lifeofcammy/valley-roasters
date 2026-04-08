@@ -13,27 +13,27 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <>
-      {/* Hero with image */}
-      <section className="relative min-h-[50vh] flex items-center">
+      {/* Hero with image + Ken Burns */}
+      <section className="relative min-h-[60vh] sm:min-h-[70vh] flex items-center overflow-hidden">
         <div className="absolute inset-0">
           <Image
             src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1920&q=80"
             alt="Coffee being prepared"
             fill
-            className="object-cover"
+            className="object-cover animate-ken-burns"
             priority
           />
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/70" />
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-24 w-full">
           <div className="max-w-3xl">
-            <span className="text-primary font-semibold text-sm uppercase tracking-widest">
+            <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
               Our Story
             </span>
-            <h1 className="font-display text-5xl sm:text-6xl font-bold text-white mt-3 leading-tight">
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-white mt-3 leading-tight">
               Roasted with Purpose
             </h1>
-            <p className="mt-6 text-xl text-white/80 leading-relaxed">
+            <p className="mt-5 sm:mt-6 text-lg sm:text-xl text-white/80 leading-relaxed max-w-2xl">
               At Valley Specialty Roasters, great coffee starts with great relationships —
               with our farmers, our partners, and our community.
             </p>
@@ -42,15 +42,15 @@ export default function AboutPage() {
       </section>
 
       {/* Story Section */}
-      <section className="py-24">
+      <section className="py-20 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <span className="text-primary font-semibold text-sm uppercase tracking-widest">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <div className="fade-up-on-scroll">
+              <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
                 How We Started
               </span>
-              <h2 className="font-display text-4xl font-bold mt-3 mb-6">Our Journey</h2>
-              <div className="space-y-5 text-lg text-muted-foreground leading-relaxed">
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3 mb-6">Our Journey</h2>
+              <div className="space-y-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
                 <p>
                   Valley Specialty Roasters was founded on a simple belief: businesses
                   deserve access to the same exceptional coffee that the best specialty
@@ -68,12 +68,12 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl fade-up-delay-1">
               <Image
                 src="https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&q=80"
                 alt="Coffee roasting facility"
                 fill
-                className="object-cover"
+                className="object-cover animate-ken-burns"
               />
             </div>
           </div>
@@ -81,44 +81,47 @@ export default function AboutPage() {
       </section>
 
       {/* Values */}
-      <section className="py-24 bg-muted">
+      <section className="py-20 sm:py-24 bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="text-primary font-semibold text-sm uppercase tracking-widest">
+          <div className="text-center mb-12 sm:mb-16 fade-up-on-scroll">
+            <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
               Our Values
             </span>
-            <h2 className="font-display text-4xl sm:text-5xl font-bold mt-3">
+            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
               What Drives Us
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {[
               {
                 image: "https://images.unsplash.com/photo-1524350876685-274059332603?w=600&q=80",
                 title: "Ethical Sourcing",
                 description:
                   "We pay premiums above market rate to our producers, investing in sustainable farming practices and long-term partnerships.",
+                delay: "fade-up-on-scroll",
               },
               {
                 image: "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=600&q=80",
                 title: "Craft Roasting",
                 description:
                   "Every batch is profiled, monitored, and adjusted with precision. We develop the full potential of each coffee we source.",
+                delay: "fade-up-delay-1",
               },
               {
                 image: "https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=600&q=80",
                 title: "Partner Success",
                 description:
                   "Your success is our success. We provide training resources, brewing guidance, and dedicated support.",
+                delay: "fade-up-delay-2",
               },
             ].map((value) => (
-              <div key={value.title} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                <div className="relative h-56">
+              <div key={value.title} className={`group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${value.delay}`}>
+                <div className="relative h-56 overflow-hidden">
                   <Image
                     src={value.image}
                     alt={value.title}
                     fill
-                    className="object-cover"
+                    className="object-cover group-hover:scale-110 transition-transform duration-700"
                   />
                 </div>
                 <div className="p-6">
@@ -136,9 +139,9 @@ export default function AboutPage() {
       </section>
 
       {/* Visit Us */}
-      <section className="py-20 bg-muted/40">
+      <section className="py-16 sm:py-20 bg-muted/40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 fade-up-on-scroll">
             <div className="flex items-start gap-4">
               <MapPin className="h-6 w-6 text-primary mt-1 shrink-0" />
               <div>
@@ -156,7 +159,7 @@ export default function AboutPage() {
                 <p className="font-display text-lg font-semibold">Get in Touch</p>
                 <a
                   href="mailto:info@valleyspecialtyroasters.com"
-                  className="text-muted-foreground hover:text-primary transition-colors mt-1 inline-block"
+                  className="text-muted-foreground hover:text-primary transition-colors mt-1 inline-block break-all"
                 >
                   info@valleyspecialtyroasters.com
                 </a>
@@ -167,17 +170,17 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="font-display text-4xl font-bold">
+      <section className="py-20 sm:py-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center fade-up-on-scroll">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold">
             Ready to Partner with Us?
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
             We&apos;d love to supply your business with exceptional coffee.
           </p>
           <div className="mt-8">
             <Link href="/register">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white font-semibold px-8">
+              <Button size="lg" className="btn-lift bg-primary hover:bg-primary/90 text-white font-semibold px-8">
                 Apply for Wholesale
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
