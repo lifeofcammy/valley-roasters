@@ -85,36 +85,11 @@ export default async function HomePage() {
 
       {/* Split Feature - Image + Text */}
       <section className="py-0">
-        {/* Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[60vh] lg:min-h-[70vh]">
-          <div className="relative min-h-[280px] lg:min-h-0">
-            <Image
-              src="https://images.unsplash.com/photo-1611854779393-1b2da9d400fe?w=960&q=80"
-              alt="Green coffee beans being sorted"
-              fill
-              className="object-cover animate-ken-burns"
-            />
-          </div>
-          <div className="flex items-center px-6 sm:px-12 lg:px-20 py-16 sm:py-20 bg-muted fade-up-on-scroll">
-            <div className="max-w-lg">
-              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">01</span>
-              <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mt-4 mb-5">
-                Sourced with Intention
-              </h3>
-              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-                We build direct relationships with producers around the world.
-                Every lot is cupped, scored, and selected for exceptional quality
-                before we commit to purchasing.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2 - Reversed */}
+        {/* Row 1 (was Row 2) - Small-Batch Roasted */}
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[60vh] lg:min-h-[70vh]">
           <div className="flex items-center px-6 sm:px-12 lg:px-20 py-16 sm:py-20 bg-white order-2 lg:order-1 fade-up-on-scroll">
             <div className="max-w-lg">
-              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">02</span>
+              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">01</span>
               <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mt-4 mb-5">
                 Small-Batch Roasted
               </h3>
@@ -150,7 +125,7 @@ export default async function HomePage() {
           </div>
           <div className="flex items-center px-6 sm:px-12 lg:px-20 py-16 sm:py-20 bg-secondary text-secondary-foreground fade-up-on-scroll">
             <div className="max-w-lg">
-              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">03</span>
+              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">02</span>
               <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mt-4 mb-5">
                 Effortless Ordering
               </h3>

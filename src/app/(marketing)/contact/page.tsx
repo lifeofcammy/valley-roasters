@@ -96,8 +96,8 @@ export default function ContactPage() {
                       Message Sent!
                     </h2>
                     <p className="text-muted-foreground text-base sm:text-lg">
-                      Thank you for reaching out. We&apos;ll get back to you within
-                      1 business day.
+                      Thank you for reaching out. We&apos;ll get back to you as
+                      soon as possible.
                     </p>
                   </CardContent>
                 </Card>

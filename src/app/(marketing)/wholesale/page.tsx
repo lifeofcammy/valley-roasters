@@ -150,7 +150,7 @@ export default async function WholesalePage() {
                 icon: ClipboardList,
                 title: "Apply & Get Approved",
                 description:
-                  "Submit a quick application. We'll review it and set up your account with custom wholesale pricing within 1 business day.",
+                  "Submit a quick application. We'll review it and set up your account with custom wholesale pricing tailored to your business.",
                 delay: "fade-up-on-scroll",
               },
               {
