@@ -2,7 +2,24 @@
 
 ## What This Is
 
-This is the complete website for Valley Specialty Roasters — a premium B2B wholesale coffee ordering platform. It includes a public marketing website, a customer ordering portal with one-click reorder, Stripe payment processing, and an admin dashboard for managing orders, customers, products, and custom pricing.
+This is the complete website for Valley Specialty Roasters — a premium B2B wholesale coffee ordering platform. It includes a public marketing website, a customer ordering portal with one-click reorder, payment processing (via Square — pending integration), and an admin dashboard for managing orders, customers, products, and custom pricing.
+
+---
+
+## 📋 Companion Documents
+
+Before final launch, walk through these review documents with Jackie:
+
+- **[`JACKIE-REVIEW.md`](./JACKIE-REVIEW.md)** — Full copy review checklist.
+  Every line of text currently on the live site, with checkboxes and
+  blank lines for corrections. Use this to verify all marketing copy,
+  product details, and operational claims are accurate before launch.
+
+- **[`SESSION-CONTINUE.md`](./SESSION-CONTINUE.md)** — Developer session
+  context. Internal notes for whoever picks up the build next.
+
+- **[`AGENTS.md`](./AGENTS.md)** — Important note: this project uses a
+  newer version of Next.js with breaking changes from prior versions.
 
 ---
 
