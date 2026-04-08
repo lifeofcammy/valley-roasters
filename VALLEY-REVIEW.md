@@ -1,8 +1,8 @@
-# Valley Specialty Roasters — Website Review with Jackie
+# Valley Specialty Roasters — Website Content Review
 
 **Live site:** https://valleyspecialtyroasters.com
 **Date prepared:** April 8, 2026
-**For review by:** Jackie Ludgate
+**For review by:** Valley Specialty Roasters leadership
 
 ---
 
@@ -138,7 +138,7 @@ Currently displays **8 coffee products** pulled from the database. See **PRODUCT
 **Step 01 — Apply & Get Approved**
 - *"Submit a quick application. We'll review it and set up your account with custom wholesale pricing tailored to your business."*
   - [ ] OK
-  - **Want to add a timeline?** (e.g. "within X days")  ____________________________
+  - **Want to commit to a turnaround timeline?** (e.g. "within X days")  ____________________________
 
 **Step 02 — Browse & Order**
 - *"Log into your wholesale portal to see your personalized pricing. Browse our selection and place your order in minutes."*
@@ -204,7 +204,7 @@ Currently displays **8 coffee products** pulled from the database. See **PRODUCT
 
 ## ☕ PRODUCTS — Database (8 items)
 
-These are the products currently displayed on the homepage and wholesale page. **Confirm each one OR strike through and replace.**
+These are the products currently displayed on the homepage and wholesale page. **Confirm each one OR strike through and replace with the actual product list.**
 
 | # | Name | Origin | Roast | Description (excerpted) |
 |---|------|--------|-------|-------------------------|
@@ -236,7 +236,7 @@ These are the products currently displayed on the homepage and wholesale page. *
 
 All photos currently on the site are **Unsplash stock photos** (free, licensed for commercial use). They are **placeholders**.
 
-- **Photos Jackie can provide:**
+- **Photos Valley Roasters can provide:**
   - [ ] Roastery / facility photos
   - [ ] Team photos
   - [ ] Product / coffee bag photos
@@ -244,7 +244,7 @@ All photos currently on the site are **Unsplash stock photos** (free, licensed f
   - [ ] Latte art / beverage photos
   - [ ] Partner cafe photos
 
-When you have photos, send them to Cam and he'll swap them in.
+When the photos are ready, send them to Cam and he'll swap them in.
 
 ---
 
@@ -277,7 +277,7 @@ The site currently uses **1 looping background video** in the "Small-Batch Roast
 
 ---
 
-## 📋 BEFORE LAUNCH — Jackie's sign-off
+## 📋 BEFORE LAUNCH — Leadership sign-off
 
 - [ ] All site copy reviewed and corrected (above)
 - [ ] All product information verified

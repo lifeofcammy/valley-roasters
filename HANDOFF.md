@@ -10,10 +10,11 @@ This is the complete website for Valley Specialty Roasters — a premium B2B who
 
 Before final launch, walk through these review documents with Jackie:
 
-- **[`JACKIE-REVIEW.md`](./JACKIE-REVIEW.md)** — Full copy review checklist.
+- **[`VALLEY-REVIEW.md`](./VALLEY-REVIEW.md)** — Full copy review checklist.
   Every line of text currently on the live site, with checkboxes and
-  blank lines for corrections. Use this to verify all marketing copy,
-  product details, and operational claims are accurate before launch.
+  blank lines for corrections. Walk through this with Valley Roasters
+  leadership to verify all marketing copy, product details, and
+  operational claims are accurate before launch.
 
 - **[`SESSION-CONTINUE.md`](./SESSION-CONTINUE.md)** — Developer session
   context. Internal notes for whoever picks up the build next.
