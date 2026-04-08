@@ -72,18 +72,11 @@ export default async function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="btn-lift w-full sm:w-auto border-white/20 text-white hover:bg-white/10 text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-semibold"
+                className="btn-lift w-full sm:w-auto bg-transparent border-2 border-white/40 text-white hover:bg-white/15 hover:border-white/70 hover:text-white text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-semibold backdrop-blur-sm"
               >
                 Our Story
               </Button>
             </Link>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-1.5">
-            <div className="w-1.5 h-2.5 bg-white/50 rounded-full" />
           </div>
         </div>
       </section>
