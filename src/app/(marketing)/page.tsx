@@ -17,17 +17,17 @@ export default async function HomePage() {
     <>
       {/* HERO - Logo-centered, dramatic, Ken Burns background */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background - dark roasted beans with slow Ken Burns motion */}
-        <div className="absolute inset-0 bg-[#0c0705]">
+        {/* Background image — full visibility with a soft vignette so text stays readable */}
+        <div className="absolute inset-0 bg-[#1c1210]">
           <Image
             src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=1920&q=85"
             alt="Coffee art"
             fill
-            className="object-cover opacity-30 animate-ken-burns"
+            className="object-cover opacity-80 animate-ken-burns"
             priority
           />
-          {/* Vignette overlay for depth */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+          {/* Vignette overlay — light enough to keep the photo bright and warm */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/35" />
         </div>
 
 
