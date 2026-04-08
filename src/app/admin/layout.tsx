@@ -5,6 +5,7 @@ import {
   Package,
   Users,
   Coffee,
+  Mail,
   ArrowLeft,
 } from "lucide-react";
 import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
@@ -12,6 +13,7 @@ import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
 const adminLinks: MobileNavLink[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: Package },
+  { href: "/admin/messages", label: "Messages", icon: Mail },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/products", label: "Products", icon: Coffee },
 ];
