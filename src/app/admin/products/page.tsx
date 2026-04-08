@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -153,18 +152,21 @@ export default function AdminProductsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="font-display text-3xl font-bold">Products</h1>
+      <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
+        <h1 className="font-display text-2xl sm:text-3xl font-bold">
+          Products
+        </h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger
             render={
-              <Button onClick={openNew}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Product
+              <Button onClick={openNew} size="sm" className="sm:size-default">
+                <Plus className="sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Add Product</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             }
           />
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[90vh] overflow-y-auto sm:w-full">
             <DialogHeader>
               <DialogTitle className="font-display">
                 {editing?.id ? "Edit Product" : "Add Product"}
@@ -172,7 +174,7 @@ export default function AdminProductsPage() {
             </DialogHeader>
             {editing && (
               <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Name</Label>
                     <Input
@@ -197,21 +199,26 @@ export default function AdminProductsPage() {
                   <Textarea
                     value={editing.description || ""}
                     onChange={(e) =>
-                      setEditing((p) => ({ ...p, description: e.target.value }))
+                      setEditing((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
                     }
                     rows={3}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Roast Level</Label>
                     <Select
                       value={editing.roast_level || "medium"}
                       onValueChange={(v) =>
-                        setEditing((p) => (p ? { ...p, roast_level: v ?? "medium" } : p))
+                        setEditing((p) =>
+                          p ? { ...p, roast_level: v ?? "medium" } : p
+                        )
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -238,6 +245,7 @@ export default function AdminProductsPage() {
                     <Input
                       type="number"
                       step="0.01"
+                      inputMode="decimal"
                       value={
                         editing.base_price_cents
                           ? (editing.base_price_cents / 100).toFixed(2)
@@ -262,11 +270,12 @@ export default function AdminProductsPage() {
                     placeholder="Chocolate, Caramel, Walnut"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Min Order Qty</Label>
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={editing.min_order_qty || 5}
                       onChange={(e) =>
                         setEditing((p) => ({
@@ -280,6 +289,7 @@ export default function AdminProductsPage() {
                     <Label>Sort Order</Label>
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={editing.sort_order || 0}
                       onChange={(e) =>
                         setEditing((p) => ({
@@ -299,7 +309,55 @@ export default function AdminProductsPage() {
         </Dialog>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="border rounded-lg p-4 bg-card"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-base truncate">
+                  {product.name}
+                </p>
+                {product.origin && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    {product.origin}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => openEdit(product)}
+                aria-label={`Edit ${product.name}`}
+                className="h-11 w-11 flex-shrink-0"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
+              <span className="text-sm">
+                <span className="font-medium">
+                  ${(product.base_price_cents / 100).toFixed(2)}
+                </span>
+                <span className="text-muted-foreground">/lb</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  &middot; {product.roast_level}
+                </span>
+              </span>
+              <Badge variant={product.is_active ? "default" : "secondary"}>
+                {product.is_active ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
