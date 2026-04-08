@@ -61,20 +61,26 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold mb-8">Dashboard</h1>
+      <h1 className="font-display text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">
+        Dashboard
+      </h1>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
         {stats.map((stat) => (
           <Card key={stat.label}>
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center gap-4">
-                <div className="p-2 rounded-full bg-primary/10">
+                <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
                   <stat.icon className="h-5 w-5 text-primary" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground truncate">
+                    {stat.label}
+                  </p>
+                  <p className="text-xl sm:text-2xl font-bold truncate">
+                    {stat.value}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -84,11 +90,11 @@ export default async function AdminDashboardPage() {
 
       {/* Recent Orders */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Orders</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="text-base sm:text-lg">Recent Orders</CardTitle>
           <Link
             href="/admin/orders"
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary hover:underline flex-shrink-0"
           >
             View All
           </Link>
@@ -99,23 +105,28 @@ export default async function AdminDashboardPage() {
               No orders yet.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {recentOrdersRes.data.map((order) => (
                 <Link
                   key={order.id}
                   href={`/admin/orders/${order.id}`}
-                  className="flex items-center justify-between p-3 rounded-md hover:bg-muted transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-md hover:bg-muted transition-colors"
                 >
-                  <div>
-                    <p className="font-medium">
-                      Order #{order.order_number} &mdash;{" "}
-                      {(order.profiles as { company_name: string })?.company_name ?? "Unknown"}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">
+                      Order #{order.order_number}
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        &mdash;{" "}
+                        {(order.profiles as { company_name: string })
+                          ?.company_name ?? "Unknown"}
+                      </span>
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {format(new Date(order.created_at), "MMM d, yyyy h:mm a")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
                     <span className="font-medium">
                       ${(order.total_cents / 100).toFixed(2)}
                     </span>
