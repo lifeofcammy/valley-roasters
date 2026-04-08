@@ -43,6 +43,8 @@
   --color-card: var(--card);
   --color-warm: var(--warm);
   --color-warm-foreground: var(--warm-foreground);
+  --color-sunset: var(--sunset);
+  --color-sky: var(--sky);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -53,41 +55,43 @@
 }
 
 :root {
-  /* Valley Specialty Roasters - Premium Coffee Brand */
-  --background: #faf9f6;
-  --foreground: #1a1a1a;
+  /* Valley Specialty Roasters - Vibrant desert sunset palette */
+  --background: #fefcf9;
+  --foreground: #1c1210;
   --card: #ffffff;
-  --card-foreground: #1a1a1a;
+  --card-foreground: #1c1210;
   --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
-  --primary: #7c2d2d;
-  --primary-foreground: #faf9f6;
-  --secondary: #c4956a;
-  --secondary-foreground: #1a1a1a;
-  --muted: #f0ece4;
-  --muted-foreground: #6b6560;
-  --accent: #f0ece4;
-  --accent-foreground: #1a1a1a;
+  --popover-foreground: #1c1210;
+  --primary: #c8720c;
+  --primary-foreground: #ffffff;
+  --secondary: #1c1210;
+  --secondary-foreground: #fefcf9;
+  --muted: #f5f0e8;
+  --muted-foreground: #78706a;
+  --accent: #f5f0e8;
+  --accent-foreground: #1c1210;
   --destructive: #dc2626;
-  --border: #e0dbd0;
-  --input: #e0dbd0;
-  --ring: #7c2d2d;
-  --warm: #c4956a;
-  --warm-foreground: #1a1a1a;
-  --chart-1: #7c2d2d;
-  --chart-2: #c4956a;
-  --chart-3: #8b7355;
-  --chart-4: #4a3728;
-  --chart-5: #d4c5a9;
+  --border: #e8e0d4;
+  --input: #e8e0d4;
+  --ring: #c8720c;
+  --warm: #d4942a;
+  --warm-foreground: #1c1210;
+  --sunset: #e8871e;
+  --sky: #2a6fa8;
+  --chart-1: #c8720c;
+  --chart-2: #2a6fa8;
+  --chart-3: #d4942a;
+  --chart-4: #4a8c5c;
+  --chart-5: #8b5e3c;
   --radius: 0.5rem;
-  --sidebar: #faf9f6;
-  --sidebar-foreground: #1a1a1a;
-  --sidebar-primary: #7c2d2d;
-  --sidebar-primary-foreground: #faf9f6;
-  --sidebar-accent: #f0ece4;
-  --sidebar-accent-foreground: #1a1a1a;
-  --sidebar-border: #e0dbd0;
-  --sidebar-ring: #7c2d2d;
+  --sidebar: #1c1210;
+  --sidebar-foreground: #fefcf9;
+  --sidebar-primary: #d4942a;
+  --sidebar-primary-foreground: #1c1210;
+  --sidebar-accent: #2c1e14;
+  --sidebar-accent-foreground: #fefcf9;
+  --sidebar-border: #3d2a1a;
+  --sidebar-ring: #d4942a;
 }
 
 @layer base {

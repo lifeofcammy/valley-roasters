@@ -1,8 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { Coffee, Truck, Users, ArrowRight } from "lucide-react";
+import { ArrowRight, Star, MapPin } from "lucide-react";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -15,176 +15,312 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Hero Section */}
-      <section className="relative bg-foreground text-background overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-foreground via-foreground/95 to-primary/30" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
-          <div className="max-w-3xl">
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-              Small-Batch Roasted Coffee for{" "}
-              <span className="text-secondary">Discerning Businesses</span>
-            </h1>
-            <p className="mt-6 text-lg sm:text-xl text-background/70 max-w-2xl leading-relaxed">
-              Premium specialty coffee sourced from the world&apos;s finest origins,
-              roasted to order, and delivered fresh to your business. Elevate your
-              coffee program with Valley Specialty Roasters.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <Link href="/wholesale">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground text-base px-8">
-                  Become a Partner
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/about">
-                <Button size="lg" variant="outline" className="border-background/30 text-background hover:bg-background/10 text-base px-8">
-                  Our Story
-                </Button>
-              </Link>
+      {/* HERO - Logo-centered, dramatic */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background - dark roasted beans */}
+        <div className="absolute inset-0 bg-[#0c0705]">
+          <Image
+            src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=1920&q=85"
+            alt="Coffee art"
+            fill
+            className="object-cover opacity-30"
+            priority
+          />
+        </div>
+
+        {/* Content centered */}
+        <div className="relative text-center px-4 py-20">
+          {/* Large logo */}
+          <div className="mb-8">
+            <Image
+              src="/logo.png"
+              alt="Valley Specialty Roasters"
+              width={280}
+              height={280}
+              className="mx-auto rounded-full shadow-2xl ring-4 ring-white/10"
+              priority
+            />
+          </div>
+
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] tracking-tight max-w-4xl mx-auto">
+            Specialty Coffee
+            <br />
+            <span className="text-primary">Roasted to Order</span>
+          </h1>
+          <p className="mt-6 text-xl sm:text-2xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+            Premium wholesale coffee for Arizona&apos;s finest cafes, restaurants,
+            and businesses.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-white/40">
+            <MapPin className="h-4 w-4" />
+            <span className="text-sm uppercase tracking-widest">Gilbert, Arizona</span>
+          </div>
+
+          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/wholesale">
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-white text-lg px-10 py-7 font-semibold shadow-lg shadow-primary/25"
+              >
+                Become a Wholesale Partner
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/about">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10 text-lg px-10 py-7 font-semibold"
+              >
+                Our Story
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-1.5">
+            <div className="w-1.5 h-2.5 bg-white/50 rounded-full" />
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Bar */}
+      <section className="bg-primary text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            {[
+              { number: "8+", label: "Single Origins" },
+              { number: "15+", label: "Wholesale Partners" },
+              { number: "100%", label: "Specialty Grade" },
+              { number: "48hr", label: "Roast to Ship" },
+            ].map((stat) => (
+              <div key={stat.label}>
+                <p className="text-3xl sm:text-4xl font-display font-bold">{stat.number}</p>
+                <p className="text-sm text-white/60 mt-1 uppercase tracking-wider font-medium">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Split Feature - Image + Text */}
+      <section className="py-0">
+        {/* Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[70vh]">
+          <div className="relative">
+            <Image
+              src="https://images.unsplash.com/photo-1611854779393-1b2da9d400fe?w=960&q=80"
+              alt="Green coffee beans being sorted"
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="flex items-center px-8 sm:px-16 lg:px-20 py-20 bg-muted">
+            <div className="max-w-lg">
+              <span className="text-primary font-bold text-7xl font-display leading-none">01</span>
+              <h3 className="font-display text-3xl sm:text-4xl font-bold mt-4 mb-5">
+                Sourced with Intention
+              </h3>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                We build direct relationships with producers across Ethiopia, Colombia,
+                Guatemala, Kenya, and beyond. Every lot is cupped, scored, and selected
+                for exceptional quality before we commit to purchasing.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2 - Reversed */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[70vh]">
+          <div className="flex items-center px-8 sm:px-16 lg:px-20 py-20 bg-white order-2 lg:order-1">
+            <div className="max-w-lg">
+              <span className="text-primary font-bold text-7xl font-display leading-none">02</span>
+              <h3 className="font-display text-3xl sm:text-4xl font-bold mt-4 mb-5">
+                Small-Batch Roasted
+              </h3>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Your coffee is never pulled from a shelf. Every order is roasted fresh in small
+                batches with precision profiles developed for each origin. Peak flavor, every time.
+              </p>
+            </div>
+          </div>
+          <div className="relative order-1 lg:order-2">
+            <Image
+              src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=960&q=80"
+              alt="Coffee roasting process"
+              fill
+              className="object-cover"
+            />
+          </div>
+        </div>
+
+        {/* Row 3 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[70vh]">
+          <div className="relative">
+            <Image
+              src="https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=960&q=80"
+              alt="Coffee farm landscape"
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="flex items-center px-8 sm:px-16 lg:px-20 py-20 bg-secondary text-secondary-foreground">
+            <div className="max-w-lg">
+              <span className="text-primary font-bold text-7xl font-display leading-none">03</span>
+              <h3 className="font-display text-3xl sm:text-4xl font-bold mt-4 mb-5">
+                Effortless Ordering
+              </h3>
+              <p className="text-lg text-secondary-foreground/70 leading-relaxed">
+                Your own wholesale portal with custom pricing, order history, and one-click
+                reordering. Place an order in under 60 seconds. Dedicated account support
+                and flexible sizing from 5lb to 50lb bags.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Value Props */}
-      <section className="py-20 sm:py-24 bg-muted">
+      {/* Coffee Selection */}
+      <section className="py-24 bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
-              Why Partner With Us
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              We&apos;re committed to quality at every step, from sourcing to delivery.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-16 gap-4">
+            <div>
+              <span className="text-primary font-semibold text-sm uppercase tracking-widest">
+                Our Selection
+              </span>
+              <h2 className="font-display text-4xl sm:text-5xl font-bold mt-3">
+                Current Offerings
+              </h2>
+            </div>
+            <Link href="/wholesale">
+              <Button variant="outline" className="font-semibold">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: Coffee,
-                title: "Sourced with Care",
-                description:
-                  "Direct relationships with farmers across the world's premier growing regions. Every lot is carefully evaluated and selected for exceptional quality.",
-              },
-              {
-                icon: Truck,
-                title: "Roasted to Order",
-                description:
-                  "Your coffee is roasted fresh when you order it — never sitting on a shelf. Small-batch precision ensures peak flavor in every bag.",
-              },
-              {
-                icon: Users,
-                title: "Dedicated Support",
-                description:
-                  "A personal account representative, custom pricing, and a streamlined ordering portal. We make wholesale coffee easy.",
-              },
-            ].map((item) => (
-              <Card key={item.title} className="border-0 shadow-sm bg-background">
-                <CardContent className="pt-8 pb-6 px-6 text-center">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-6">
-                    <item.icon className="h-7 w-7 text-primary" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {products?.map((product, index) => {
+              const coffeeImages = [
+                "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&q=80",
+                "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=400&q=80",
+                "https://images.unsplash.com/photo-1498804103079-a6351b050096?w=400&q=80",
+                "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&q=80",
+              ];
+              return (
+                <div
+                  key={product.id}
+                  className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                >
+                  <div className="relative h-64 overflow-hidden">
+                    <Image
+                      src={coffeeImages[index % coffeeImages.length]}
+                      alt={product.name}
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                        {product.origin}
+                      </span>
+                    </div>
                   </div>
-                  <h3 className="font-display text-xl font-semibold mb-3">
-                    {item.title}
-                  </h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {item.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Coffees */}
-      <section className="py-20 sm:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
-              Our Coffee Selection
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Exceptional single origins and carefully crafted blends,
-              available exclusively to our wholesale partners.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products?.map((product) => (
-              <Card key={product.id} className="group hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="w-full h-48 bg-muted rounded-md mb-4 flex items-center justify-center">
-                    <Coffee className="h-16 w-16 text-muted-foreground/30" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-secondary uppercase tracking-wider">
-                      {product.origin}
-                    </p>
-                    <h3 className="font-display text-lg font-semibold group-hover:text-primary transition-colors">
+                  <div className="p-6">
+                    <h3 className="font-display text-xl font-bold text-foreground group-hover:text-primary transition-colors">
                       {product.name}
                     </h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
                       {product.description}
                     </p>
-                    <div className="flex flex-wrap gap-1 pt-1">
+                    <div className="flex flex-wrap gap-1.5 mt-4">
                       {product.flavor_notes?.slice(0, 3).map((note: string) => (
                         <span
                           key={note}
-                          className="inline-block text-xs px-2 py-0.5 bg-muted rounded-full text-muted-foreground"
+                          className="text-xs px-2.5 py-1 bg-muted rounded-full text-foreground/60 font-medium"
                         >
                           {note}
                         </span>
                       ))}
                     </div>
+                    <p className="text-xs text-muted-foreground mt-4 uppercase tracking-wider font-medium">
+                      {product.roast_level} roast
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <Link href="/wholesale">
-              <Button variant="outline" size="lg">
-                View Full Catalog
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* Testimonial */}
-      <section className="py-20 sm:py-24 bg-primary text-primary-foreground">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="relative py-32 overflow-hidden">
+        <div className="absolute inset-0 bg-[#0c0705]">
+          <Image
+            src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1920&q=80"
+            alt="Barista at work"
+            fill
+            className="object-cover opacity-25"
+          />
+        </div>
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="flex justify-center gap-1 mb-8">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="h-7 w-7 fill-primary text-primary" />
+            ))}
+          </div>
           <blockquote>
-            <p className="font-display text-2xl sm:text-3xl font-medium italic leading-relaxed">
-              &ldquo;Valley Specialty Roasters transformed our coffee program. The quality
-              is unmatched, and the reorder process couldn&apos;t be simpler.&rdquo;
+            <p className="font-display text-3xl sm:text-4xl lg:text-5xl font-medium text-white italic leading-snug">
+              &ldquo;Valley Specialty Roasters completely transformed our coffee program.
+              The quality is unmatched.&rdquo;
             </p>
-            <footer className="mt-8">
-              <p className="font-semibold text-lg">Local Cafe Owner</p>
-              <p className="text-primary-foreground/60">Wholesale Partner</p>
+            <footer className="mt-10">
+              <p className="font-semibold text-xl text-white">Jackie Ludgate</p>
+              <p className="text-primary mt-1 font-medium">Top Cup Coffee House &middot; Gilbert, AZ</p>
             </footer>
           </blockquote>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="py-20 sm:py-24">
+      <section className="py-28 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
-            Ready to Elevate Your Coffee Program?
+          <Image
+            src="/logo.png"
+            alt="Valley Specialty Roasters"
+            width={120}
+            height={120}
+            className="rounded-full mx-auto mb-10 shadow-lg"
+          />
+          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
+            Ready to Elevate Your
+            <br />
+            <span className="text-primary">Coffee Program?</span>
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join our growing family of wholesale partners and experience the
-            difference that specialty-grade, small-batch roasted coffee makes.
+          <p className="mt-6 text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Join our growing family of wholesale partners across Arizona.
           </p>
-          <div className="mt-8">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/register">
-              <Button size="lg" className="text-base px-8">
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-white text-lg px-10 py-7 font-semibold shadow-lg shadow-primary/25"
+              >
                 Apply for Wholesale Access
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/contact">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-10 py-7 font-semibold"
+              >
+                Contact Us
               </Button>
             </Link>
           </div>

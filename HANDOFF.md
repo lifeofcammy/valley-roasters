@@ -1,118 +1,148 @@
-# Valley Specialty Roasters - Website Handoff Guide
+# Valley Specialty Roasters - Client Handoff Guide
 
-## Overview
+## What This Is
 
-This is the complete website for Valley Specialty Roasters, a premium B2B wholesale coffee platform. It includes a public marketing website, a customer ordering portal with one-click reorder, and an admin dashboard for managing orders, customers, and products.
-
-**Live URL**: (will be added after Vercel deployment)
-**Domain**: valleyspecialtyroasters.com (GoDaddy)
+This is the complete website for Valley Specialty Roasters — a premium B2B wholesale coffee ordering platform. It includes a public marketing website, a customer ordering portal with one-click reorder, Stripe payment processing, and an admin dashboard for managing orders, customers, products, and custom pricing.
 
 ---
 
-## Tech Stack
+## Accounts Valley Roasters Needs to Create
 
-| Service | Purpose | Dashboard URL |
-|---------|---------|---------------|
-| **Vercel** | Website hosting | https://vercel.com/dashboard |
-| **Supabase** | Database, auth, storage | https://supabase.com/dashboard/project/poldnqhuuofgbdxkiyzj |
-| **Stripe** | Payment processing | https://dashboard.stripe.com |
-| **GitHub** | Source code | https://github.com/lifeofcammy/valley-roasters |
-| **GoDaddy** | Domain registrar | https://dcc.godaddy.com |
+Valley Roasters should own all accounts. Here's what to set up:
 
----
+### 1. Vercel (Website Hosting + Analytics)
+- **Sign up**: https://vercel.com/signup (use a company email)
+- **What it does**: Hosts the website, auto-deploys when code changes, provides analytics
+- **Enable Analytics**: Go to Project > Analytics > Enable (free tier available)
+- **Cost**: Free tier handles this site easily. Pro plan ($20/mo) adds more analytics.
 
-## Accounts & Access
+### 2. Supabase (Database + User Authentication)
+- **Sign up**: https://supabase.com/dashboard (use a company email)
+- **What it does**: Stores all customer data, orders, products, pricing, and handles user login/registration
+- **Create a project**: Name it "Valley Roasters", select region "US East"
+- **Cost**: Free tier supports up to 50,000 monthly active users — more than enough
+- **IMPORTANT**: After creating the project, you'll need to run the database migrations (6 SQL scripts provided below)
 
-### Supabase (Database & Authentication)
-- **Project Name**: Valley Roasters
-- **Project ID**: `poldnqhuuofgbdxkiyzj`
-- **Region**: US East (N. Virginia)
-- **Dashboard**: https://supabase.com/dashboard/project/poldnqhuuofgbdxkiyzj
-- **API URL**: https://poldnqhuuofgbdxkiyzj.supabase.co
+### 3. Stripe (Payment Processing)
+- **Sign up**: https://dashboard.stripe.com/register (requires business info + bank account)
+- **What it does**: Processes all online payments from wholesale customers
+- **Cost**: 2.9% + $0.30 per transaction (industry standard, no monthly fee)
+- **Setup steps**:
+  1. Complete business verification
+  2. Get API keys from https://dashboard.stripe.com/apikeys
+  3. Set up webhook endpoint: `https://valleyspecialtyroasters.com/api/stripe/webhook`
+  4. Subscribe to events: `checkout.session.completed`, `payment_intent.payment_failed`, `charge.refunded`
 
-### Stripe (Payments)
-- **Status**: Needs setup
-- **Steps to activate**:
-  1. Go to https://dashboard.stripe.com and create account
-  2. Get your API keys from https://dashboard.stripe.com/apikeys
-  3. Update the environment variables in Vercel (see Environment Variables section)
-  4. Register webhook endpoint: `https://valleyspecialtyroasters.com/api/stripe/webhook`
-  5. Subscribe to events: `checkout.session.completed`, `payment_intent.payment_failed`, `charge.refunded`
+### 4. GitHub (Source Code - Optional)
+- **Current repo**: https://github.com/lifeofcammy/valley-roasters
+- **Option A**: Transfer repo to Valley Roasters' GitHub account
+- **Option B**: Keep it under developer's account and add Valley Roasters as collaborator
+- **What it does**: Stores all website code, Vercel auto-deploys from here
 
-### Vercel (Hosting)
-- **Status**: Needs deployment
-- **Steps**: Connect GitHub repo to Vercel, add environment variables, deploy
+### 5. GoDaddy (Domain - Already Owned)
+- **Domain**: valleyspecialtyroasters.com
+- **Action needed**: Point DNS to Vercel (instructions below)
 
 ---
 
 ## Environment Variables
 
-These need to be set in Vercel project settings (Settings > Environment Variables):
+After creating all accounts, set these in Vercel (Project > Settings > Environment Variables):
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://poldnqhuuofgbdxkiyzj.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=(get from Supabase dashboard > Settings > API)
-SUPABASE_SERVICE_ROLE_KEY=(get from Supabase dashboard > Settings > API - KEEP SECRET)
-STRIPE_SECRET_KEY=(from Stripe dashboard)
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=(from Stripe dashboard)
-STRIPE_WEBHOOK_SECRET=(from Stripe webhook setup)
+NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT_ID].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[from Supabase > Settings > API > anon public]
+SUPABASE_SERVICE_ROLE_KEY=[from Supabase > Settings > API > service_role — KEEP SECRET]
+STRIPE_SECRET_KEY=[from Stripe > Developers > API keys > Secret key]
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=[from Stripe > Developers > API keys > Publishable key]
+STRIPE_WEBHOOK_SECRET=[from Stripe > Developers > Webhooks > Signing secret]
 NEXT_PUBLIC_SITE_URL=https://valleyspecialtyroasters.com
 ```
 
 ---
 
-## How It Works
+## Database Setup (Supabase)
 
-### For Customers (Wholesale Buyers)
+After creating the Supabase project, go to SQL Editor and run these 6 migrations in order. The migrations create all tables, security policies, and helper functions.
 
-1. **Register**: Go to `/register`, fill out company info
-2. **Wait for Approval**: Admin approves the account in the admin dashboard
-3. **Login**: Go to `/login`, sign in with email/password
-4. **Browse & Order**: Go to "New Order" to see products at their custom wholesale pricing
-5. **Checkout**: Click "Proceed to Checkout" to pay via Stripe
-6. **Reorder**: On the Orders page, click "Reorder" on any past order to instantly re-fill the cart
+The migrations are stored in the GitHub repo and were already applied to the development database. For a fresh Supabase project, run them from the Supabase SQL Editor in this order:
 
-### For Valley Roasters Staff (Admin)
+1. `create_profiles_table` — User profiles with company info
+2. `create_products_table` — Coffee product catalog
+3. `create_customer_pricing_table` — Per-customer price overrides
+4. `create_orders_tables` — Orders and order line items
+5. `create_rls_policies` — Row-level security (data isolation)
+6. `create_helper_functions` — Pricing calculation function
 
-1. **Login**: Use an admin account at `/login`
-2. **Dashboard** (`/admin`): See overview of orders, revenue, and customers
-3. **Orders** (`/admin/orders`): View all orders, click into any order to update status (pending > confirmed > roasting > shipped > delivered)
-4. **Customers** (`/admin/customers`):
-   - **Approve new customers**: Click "Approve" next to pending accounts
-   - **Set custom pricing**: Click into a customer, set per-product custom prices
-5. **Products** (`/admin/products`): Add, edit, or deactivate coffee products
+---
 
-### Order Status Flow
+## How the Site Works
 
+### Public Pages (No Login Required)
+- **Homepage** (`/`) — Hero with logo, value props, featured coffees, testimonial
+- **Wholesale** (`/wholesale`) — Full product catalog, FAQ, how-it-works
+- **About** (`/about`) — Company story, values, sourcing philosophy
+- **Contact** (`/contact`) — Contact form and info
+
+### Customer Flow
+1. **Register** (`/register`) — Customer fills out company info
+2. **Admin approves** the account in the admin dashboard
+3. **Login** (`/login`) — Email/password or magic link
+4. **View Orders** (`/portal/orders`) — See all past orders with status
+5. **Reorder** — Click "Reorder" on any past order → cart pre-fills → checkout via Stripe
+6. **New Order** (`/portal/reorder`) — Browse products at custom pricing, build cart, checkout
+
+### Admin Flow
+1. **Dashboard** (`/admin`) — Overview with stats (orders, revenue, customers)
+2. **Orders** (`/admin/orders`) — View all orders, update status: pending → confirmed → roasting → shipped → delivered
+3. **Customers** (`/admin/customers`) — Approve/revoke accounts, set custom per-product pricing
+4. **Products** (`/admin/products`) — Add, edit, deactivate coffee products
+
+### Payment Flow
 ```
-pending → confirmed → roasting → shipped → delivered
+Customer places order → Stripe Checkout → Payment confirmed via webhook → Order auto-updates to "confirmed"
 ```
-
-- `pending`: Order placed, awaiting payment
-- `confirmed`: Payment received (automatic via Stripe webhook)
-- `roasting`: Staff marks when roasting begins
-- `shipped`: Staff marks when shipped
-- `delivered`: Staff marks when delivered
 
 ---
 
 ## Creating the First Admin Account
 
-1. Go to `/register` and create an account
-2. Go to Supabase dashboard > SQL Editor
-3. Run this SQL (replace the email with the admin's actual email):
+1. Go to `/register` and create an account with Valley Roasters' email
+2. Go to Supabase Dashboard > SQL Editor
+3. Run:
    ```sql
    UPDATE public.profiles
    SET role = 'admin', is_approved = true
    WHERE email = 'admin@valleyspecialtyroasters.com';
    ```
-4. Now login at `/login` - you'll see the Admin Dashboard link in the sidebar
+4. Login at `/login` — the Admin Dashboard link appears in the sidebar
+
+---
+
+## Domain Setup (GoDaddy → Vercel)
+
+1. In **Vercel**: Project Settings > Domains > Add `valleyspecialtyroasters.com`
+2. In **GoDaddy DNS settings**, add:
+   - **A Record**: `@` → `76.76.21.21`
+   - **CNAME Record**: `www` → `cname.vercel-dns.com`
+3. Vercel auto-provisions SSL certificate (HTTPS)
+4. Update `NEXT_PUBLIC_SITE_URL` env var to `https://valleyspecialtyroasters.com`
+
+---
+
+## Analytics (Vercel)
+
+1. In Vercel Dashboard, go to your project
+2. Click **Analytics** tab
+3. Click **Enable** (free tier: 2,500 events/month, Pro: unlimited)
+4. Tracks: page views, unique visitors, top pages, referrers, countries, devices
+5. No code changes needed — Vercel Analytics is built into the hosting
+
+For more detailed analytics, consider adding Google Analytics (GA4) later.
 
 ---
 
 ## Products (Pre-loaded)
-
-The following 8 coffees are already in the database:
 
 | Product | Origin | Roast | Base Price/lb |
 |---------|--------|-------|---------------|
@@ -125,47 +155,45 @@ The following 8 coffees are already in the database:
 | Espresso Classico | Blend | Medium-Dark | $12.95 |
 | Kenya AA Nyeri | Kenya | Light | $16.95 |
 
-These can be edited, added to, or removed from the Admin > Products page.
+Editable from Admin > Products. These are base prices — each customer can have custom pricing set by the admin.
 
 ---
 
 ## Custom Pricing
 
-Each customer can have unique per-product pricing. To set custom prices:
+Each customer can have unique per-product wholesale pricing:
 
-1. Go to Admin > Customers
-2. Click on a customer name
-3. In the "Custom Pricing" section, enter the custom $/lb price for each product
-4. Leave blank to use the base price
-5. Click "Save Pricing"
-
-The customer will automatically see their custom price when placing orders.
+1. Admin > Customers > Click customer name
+2. "Custom Pricing" section shows all products
+3. Enter custom $/lb price (leave blank = use base price)
+4. Click "Save Pricing"
+5. Customer automatically sees their custom price when ordering
 
 ---
 
-## Domain Setup (GoDaddy → Vercel)
+## Tech Stack Reference
 
-After deploying to Vercel:
-
-1. In Vercel: Go to Project Settings > Domains > Add `valleyspecialtyroasters.com`
-2. In GoDaddy: Update DNS records as Vercel instructs (typically an A record to `76.76.21.21` and CNAME for `www`)
-3. Vercel will automatically provision an SSL certificate
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Next.js 15 | React framework, server rendering, SEO |
+| Styling | Tailwind CSS + shadcn/ui | Design system and components |
+| Hosting | Vercel | Deployment, CDN, analytics |
+| Database | Supabase (PostgreSQL) | Data storage with row-level security |
+| Auth | Supabase Auth | User registration, login, sessions |
+| Payments | Stripe Checkout | Secure payment processing |
+| Fonts | Playfair Display + Inter | Premium typography |
+| Source | GitHub | Version control |
 
 ---
 
 ## SEO
 
-The site is optimized for these keywords:
-- "Wholesale Coffee"
-- "Roasted Coffee"
-- "Specialty Coffee Roaster"
-- "Wholesale Coffee Beans"
-- "Coffee Supplier"
+Optimized for: "Wholesale Coffee", "Roasted Coffee", "Specialty Coffee Roaster", "Coffee Supplier"
 
-Key SEO features:
-- JSON-LD structured data (Organization schema + FAQ schema on /wholesale)
+Built-in:
+- JSON-LD structured data (Organization + FAQ schemas)
 - Dynamic sitemap at `/sitemap.xml`
-- robots.txt blocking portal/admin from search engines
+- `robots.txt` blocking portal/admin from search engines
 - Meta titles and descriptions on all pages
 - Mobile-responsive design
 
@@ -173,19 +201,18 @@ Key SEO features:
 
 ## Brand Identity
 
-- **Primary Color**: Deep burgundy `#7c2d2d` (coffee/mahogany tones)
-- **Secondary Color**: Warm copper `#c4956a`
-- **Background**: Warm off-white `#faf9f6`
+- **Primary Color**: Amber/Gold `#c8720c` (desert sunset from logo)
+- **Secondary Color**: Rich Coffee Brown `#1c1210`
+- **Background**: Warm White `#fefcf9`
 - **Fonts**: Playfair Display (headings) + Inter (body text)
-- **Logo**: Text-mark "VALLEY / SPECIALTY ROASTERS" with coffee bean icon
+- **Logo**: Desert sunset coffee bean with cacti — `public/logo.png`
 
 ---
 
 ## Support & Maintenance
 
-- **Source code**: GitHub (all changes should go through here)
+- **Code changes**: Push to GitHub → Vercel auto-deploys in ~1 minute
 - **Database**: Supabase dashboard for data management
-- **Payments**: Stripe dashboard for payment management, refunds
-- **Hosting**: Vercel auto-deploys when code is pushed to GitHub
-
-To make code changes: Edit files in GitHub → Vercel auto-deploys in ~1 minute.
+- **Payments**: Stripe dashboard for viewing payments, issuing refunds
+- **Orders**: Admin dashboard at `/admin` for day-to-day operations
+- **Customer issues**: Admin can approve/revoke accounts, reset custom pricing

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Logo } from "@/components/shared/Logo";
+import Image from "next/image";
 import { Package, RotateCcw, Settings, LogOut } from "lucide-react";
 
 const portalLinks = [
@@ -30,8 +30,11 @@ export default async function PortalLayout({
     <div className="min-h-screen flex flex-col sm:flex-row">
       {/* Sidebar */}
       <aside className="w-full sm:w-64 bg-foreground text-background flex-shrink-0">
-        <div className="p-6 border-b border-background/10">
-          <Logo size="small" className="[&_*]:text-background [&_span]:text-background/60" />
+        <div className="p-4 border-b border-background/10">
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Valley Specialty Roasters" width={36} height={36} className="rounded-full" />
+            <span className="font-display font-bold text-sm text-background leading-tight">Valley Specialty<br/>Roasters</span>
+          </Link>
         </div>
         <div className="p-4 border-b border-background/10">
           <p className="font-semibold text-sm">{profile?.company_name}</p>
