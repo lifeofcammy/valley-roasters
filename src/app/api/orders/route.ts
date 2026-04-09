@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -7,34 +8,98 @@ import {
   isSquareConfigured,
 } from "@/lib/square/client";
 
-interface CartItem {
-  product_id: string | null;
-  product_name: string;
-  size: string;
-  quantity: number;
-  unit_price_cents: number;
-}
+/* ------------------------------------------------------------- */
+/* Zod schema — runtime-validates every field before any write.   */
+/* ------------------------------------------------------------- */
 
+const cartItemSchema = z.object({
+  product_id: z.string().uuid().nullable(),
+  product_name: z.string().min(1).max(200),
+  size: z.string().min(1).max(50),
+  quantity: z.number().int().positive().max(10000),
+  unit_price_cents: z.number().int().nonnegative().max(1_000_000),
+});
+
+const recurringSchema = z
+  .object({
+    frequency: z.enum(["weekly", "biweekly", "monthly"]),
+    label: z.string().max(200).optional().nullable(),
+  })
+  .nullable()
+  .optional();
+
+const orderRequestSchema = z.object({
+  items: z.array(cartItemSchema).min(1).max(50),
+  recurring: recurringSchema,
+  client_nonce: z.string().min(8).max(64).optional(),
+});
+
+type CartItem = z.infer<typeof cartItemSchema>;
 type Frequency = "weekly" | "biweekly" | "monthly";
 
-interface OrderRequestBody {
-  items: CartItem[];
-  recurring?: { frequency: Frequency; label?: string } | null;
+/* ------------------------------------------------------------- */
+/* Date helpers (Phoenix time, no DST, month-end clamped)         */
+/* ------------------------------------------------------------- */
+
+function formatPhoenixDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function phoenixDatePlusDays(days: number): string {
+  const now = new Date();
+  now.setUTCDate(now.getUTCDate() + days);
+  return formatPhoenixDate(now);
+}
+
+/** Add months, clamping to last day of target month (Jan 31 → Feb 28/29). */
+function phoenixDatePlusMonths(months: number): string {
+  const todayStr = formatPhoenixDate(new Date());
+  const [y, m, d] = todayStr.split("-").map((n) => parseInt(n, 10));
+  let targetYear = y;
+  let targetMonth = m + months;
+  while (targetMonth > 12) {
+    targetMonth -= 12;
+    targetYear += 1;
+  }
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+  const day = Math.min(d, lastDay);
+  const mm = String(targetMonth).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${targetYear}-${mm}-${dd}`;
 }
 
 function nextRunDate(frequency: Frequency): string {
-  const d = new Date();
-  if (frequency === "weekly") d.setDate(d.getDate() + 7);
-  else if (frequency === "biweekly") d.setDate(d.getDate() + 14);
-  else d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  if (frequency === "weekly") return phoenixDatePlusDays(7);
+  if (frequency === "biweekly") return phoenixDatePlusDays(14);
+  return phoenixDatePlusMonths(1);
 }
 
 function net30DueDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  return d.toISOString().slice(0, 10);
+  return phoenixDatePlusDays(30);
 }
+
+/* ------------------------------------------------------------- */
+/* Settings helper                                                */
+/* ------------------------------------------------------------- */
+
+async function getAutoPublishInvoices(): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", "auto_publish_invoices")
+    .maybeSingle();
+  return data?.value === true;
+}
+
+/* ------------------------------------------------------------- */
+/* POST handler                                                   */
+/* ------------------------------------------------------------- */
 
 export async function POST(request: Request) {
   try {
@@ -47,16 +112,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as OrderRequestBody;
+    // Parse + validate body
+    let body: z.infer<typeof orderRequestSchema>;
+    try {
+      const raw = await request.json();
+      body = orderRequestSchema.parse(raw);
+    } catch (err) {
+      const msg =
+        err instanceof z.ZodError
+          ? err.issues.map((i) => i.message).join("; ")
+          : "Invalid request body";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
     const items = body.items;
     const recurring = body.recurring ?? null;
-
-    if (!items || items.length === 0) {
-      return NextResponse.json(
-        { error: "No items provided" },
-        { status: 400 }
-      );
-    }
+    const clientNonce = body.client_nonce ?? null;
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -72,6 +143,29 @@ export async function POST(request: Request) {
     }
 
     const adminSupabase = createAdminClient();
+
+    // Idempotency pre-check: if the client re-submits with the same
+    // nonce, return the existing order instead of creating a duplicate.
+    if (clientNonce) {
+      const { data: existing } = await adminSupabase
+        .from("orders")
+        .select(
+          "id, square_order_id, square_invoice_id, square_invoice_public_url"
+        )
+        .eq("profile_id", user.id)
+        .eq("client_nonce", clientNonce)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({
+          orderId: existing.id,
+          subscriptionId: null,
+          square_order_id: existing.square_order_id,
+          square_invoice_id: existing.square_invoice_id,
+          square_invoice_public_url: existing.square_invoice_public_url,
+          deduped: true,
+        });
+      }
+    }
 
     // Validate Supabase-product prices server-side via RPC.
     // Pass-through for Square items (product_id null).
@@ -99,7 +193,7 @@ export async function POST(request: Request) {
       0
     );
 
-    // 1. Save order in Supabase (system of record for the portal UI)
+    // 1. Save order in Supabase
     const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
@@ -113,18 +207,47 @@ export async function POST(request: Request) {
         shipping_city: profile.company_city,
         shipping_state: profile.company_state,
         shipping_zip: profile.company_zip,
+        client_nonce: clientNonce,
       })
       .select()
       .single();
 
     if (orderError || !order) {
+      // Unique-constraint violation on client_nonce = race with a
+      // concurrent duplicate submit. Return the existing order.
+      if (
+        clientNonce &&
+        (orderError?.code === "23505" ||
+          orderError?.message?.includes("client_nonce"))
+      ) {
+        const { data: existing } = await adminSupabase
+          .from("orders")
+          .select(
+            "id, square_order_id, square_invoice_id, square_invoice_public_url"
+          )
+          .eq("profile_id", user.id)
+          .eq("client_nonce", clientNonce)
+          .maybeSingle();
+        if (existing) {
+          return NextResponse.json({
+            orderId: existing.id,
+            subscriptionId: null,
+            square_order_id: existing.square_order_id,
+            square_invoice_id: existing.square_invoice_id,
+            square_invoice_public_url: existing.square_invoice_public_url,
+            deduped: true,
+          });
+        }
+      }
+      console.error("orders insert failed:", orderError);
       return NextResponse.json(
         { error: "Failed to create order" },
         { status: 500 }
       );
     }
 
-    await adminSupabase.from("order_items").insert(
+    // 2. Insert line items. On failure, roll back the parent order.
+    const { error: itemsError } = await adminSupabase.from("order_items").insert(
       validatedItems.map((item) => ({
         order_id: order.id,
         product_id: item.product_id,
@@ -136,10 +259,17 @@ export async function POST(request: Request) {
       }))
     );
 
-    // 2. If the customer is linked to Square, mirror the order +
-    //    create a DRAFT invoice in Square so Top Cup sees it in
-    //    their dashboard alongside POS sales. Invoice is NOT
-    //    auto-published — admin reviews and sends from Square.
+    if (itemsError) {
+      console.error("order_items insert failed:", itemsError);
+      await adminSupabase.from("orders").delete().eq("id", order.id);
+      return NextResponse.json(
+        { error: "Failed to save order items" },
+        { status: 500 }
+      );
+    }
+
+    // 3. Mirror to Square for Square-linked customers.
+    //    Square failures are logged but do NOT fail the request.
     let squareResult: {
       square_order_id?: string;
       square_invoice_id?: string;
@@ -148,6 +278,8 @@ export async function POST(request: Request) {
 
     if (profile.square_customer_id && isSquareConfigured()) {
       try {
+        const autoPublish = await getAutoPublishInvoices();
+
         const created = await createSquareOrder({
           squareCustomerId: profile.square_customer_id,
           idempotencyKey: `portal-order-${order.id}`,
@@ -166,7 +298,7 @@ export async function POST(request: Request) {
           idempotencyKey: `portal-invoice-${order.id}`,
           dueDateIso: net30DueDate(),
           title: `Valley Order #${order.order_number}`,
-          publish: false, // admin reviews in Square dashboard before sending
+          publish: autoPublish,
         });
 
         squareResult = {
@@ -175,14 +307,15 @@ export async function POST(request: Request) {
           square_invoice_public_url: inv.public_url,
         };
 
-        await adminSupabase
+        const { error: updateError } = await adminSupabase
           .from("orders")
           .update(squareResult)
           .eq("id", order.id);
+
+        if (updateError) {
+          console.error("orders update with square ids failed:", updateError);
+        }
       } catch (squareError) {
-        // Square failure must NOT block the order — the Supabase
-        // row is still valid and admin can create the invoice
-        // manually. Log it for visibility.
         console.error(
           "Square order/invoice creation failed:",
           squareError instanceof Error
@@ -192,8 +325,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Optional recurring subscription
+    // 4. Optional recurring subscription
     let subscriptionId: string | null = null;
+    let subscriptionError: string | null = null;
     if (recurring && recurring.frequency) {
       const { data: sub, error: subError } = await adminSupabase
         .from("order_subscriptions")
@@ -207,7 +341,10 @@ export async function POST(request: Request) {
         })
         .select()
         .single();
-      if (!subError && sub) {
+      if (subError) {
+        console.error("order_subscriptions insert failed:", subError);
+        subscriptionError = "Could not save recurring schedule";
+      } else if (sub) {
         subscriptionId = sub.id;
       }
     }
@@ -215,6 +352,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       orderId: order.id,
       subscriptionId,
+      subscriptionError,
       ...squareResult,
     });
   } catch (error) {

@@ -30,6 +30,14 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
+async function assertAdmin() {
+  const s = await createClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  const { data: p } = await s.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (p?.role !== "admin") throw new Error("Forbidden");
+}
+
 export default async function AdminOrderDetailPage({
   params,
 }: {
@@ -48,7 +56,13 @@ export default async function AdminOrderDetailPage({
 
   async function updateStatus(formData: FormData) {
     "use server";
-    const newStatus = formData.get("status") as string;
+    await assertAdmin();
+    const ALLOWED = ["pending","confirmed","roasting","shipped","delivered","cancelled"] as const;
+    const raw = String(formData.get("status") ?? "");
+    if (!(ALLOWED as readonly string[]).includes(raw)) {
+      throw new Error("Invalid status");
+    }
+    const newStatus = raw;
     const adminNotes = formData.get("admin_notes") as string;
     const supabase = await createClient();
 

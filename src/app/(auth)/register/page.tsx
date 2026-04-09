@@ -38,6 +38,7 @@ export default function RegisterPage() {
         data: {
           full_name: formData.fullName,
           company_name: formData.companyName,
+          company_phone: formData.companyPhone,
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -154,7 +155,7 @@ export default function RegisterPage() {
                   id="password"
                   name="password"
                   type="password"
-                  minLength={6}
+                  minLength={8}
                   value={formData.password}
                   onChange={handleChange}
                   required

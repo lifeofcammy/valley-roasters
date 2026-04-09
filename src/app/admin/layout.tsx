@@ -9,6 +9,7 @@ const adminLinks: MobileNavLink[] = [
   { href: "/admin/messages", label: "Messages", icon: "messages" },
   { href: "/admin/customers", label: "Customers", icon: "customers" },
   { href: "/admin/products", label: "Products", icon: "products" },
+  { href: "/admin/settings", label: "Settings", icon: "settings" },
 ];
 
 export default async function AdminLayout({

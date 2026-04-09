@@ -40,6 +40,14 @@ function relativeTime(iso: string): string {
   return formatDate(iso);
 }
 
+async function assertAdmin() {
+  const s = await createClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  const { data: p } = await s.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (p?.role !== "admin") throw new Error("Forbidden");
+}
+
 export default async function AdminMessagesPage() {
   const supabase = await createClient();
   const {

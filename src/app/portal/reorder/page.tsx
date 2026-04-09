@@ -46,6 +46,10 @@ export default function ReorderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
+  // Stable per-page-load nonce for order idempotency.
+  const [clientNonce] = useState(
+    () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2))
+  );
 
   const [makeRecurring, setMakeRecurring] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>("biweekly");
@@ -143,6 +147,7 @@ export default function ReorderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart,
+          client_nonce: clientNonce,
           recurring: makeRecurring
             ? { frequency, label: cart[0]?.product_name }
             : null,
@@ -156,15 +161,10 @@ export default function ReorderPage() {
           toast.success(
             `Order placed and saved as a ${frequency} recurring order.`
           );
-        } else {
-          toast.success("Order placed — we'll be in touch to confirm.");
-        }
-        if (data.orderId) {
-          router.push(`/portal/orders/${data.orderId}?placed=true`);
-        } else if (makeRecurring) {
           router.push("/portal/subscriptions");
         } else {
-          router.push("/portal/orders");
+          toast.success("Order placed — we'll be in touch to confirm.");
+          router.push("/portal/orders?placed=true");
         }
       } else {
         toast.error(data.error || "Could not place order. Please try again.");

@@ -11,6 +11,14 @@ import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
+async function assertAdmin() {
+  const s = await createClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  const { data: p } = await s.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (p?.role !== "admin") throw new Error("Forbidden");
+}
+
 export default async function AdminCustomerDetailPage({
   params,
 }: {
@@ -40,6 +48,7 @@ export default async function AdminCustomerDetailPage({
 
   async function updatePricing(formData: FormData) {
     "use server";
+    await assertAdmin();
     const supabase = await createClient();
 
     for (const [key, value] of formData.entries()) {

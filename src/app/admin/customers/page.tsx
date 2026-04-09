@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 
+async function assertAdmin() {
+  const s = await createClient();
+  const { data: { user } } = await s.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  const { data: p } = await s.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (p?.role !== "admin") throw new Error("Forbidden");
+}
+
 export default async function AdminCustomersPage() {
   const supabase = await createClient();
   const { data: customers } = await supabase

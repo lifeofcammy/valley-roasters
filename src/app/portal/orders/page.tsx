@@ -85,10 +85,11 @@ export default async function OrdersPage() {
         }));
         dataSource = "square";
       } catch (err) {
+        // Log the real error for server logs, but show a generic
+        // message to the customer — never leak Square API internals.
+        console.error("[portal/orders] Square fetch failed:", err);
         loadError =
-          err instanceof Error
-            ? err.message
-            : "Could not reach Square — please try again.";
+          "We couldn't load your recent orders. Please refresh in a moment.";
       }
     } else {
       // Fallback: read from Supabase orders table
@@ -101,7 +102,9 @@ export default async function OrdersPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        loadError = error.message;
+        console.error("[portal/orders] Supabase fetch failed:", error);
+        loadError =
+          "We couldn't load your recent orders. Please refresh in a moment.";
       } else if (Array.isArray(data)) {
         orders = data.map((o) => ({
           id: String(o.id),

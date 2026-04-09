@@ -77,49 +77,61 @@ export default async function OrderDetailPage({
 
   let order: NormalizedOrder | null = null;
 
+  // Square-backed customer: try Square first, fall through to Supabase.
+  // The detail page can be reached with either a Square order id (from
+  // /portal/orders list) or a Supabase UUID (from an order just placed
+  // in the portal). Rather than crash on the UUID path, try Square,
+  // catch the inevitable 404, and then fall into the Supabase branch.
   if (profile?.square_customer_id && isSquareConfigured()) {
-    // Square-backed customer: read this order from Square
-    const squareOrder = await fetchOrderForCustomer(
-      id,
-      profile.square_customer_id
-    );
-    if (!squareOrder) notFound();
+    let squareOrder: Awaited<ReturnType<typeof fetchOrderForCustomer>> = null;
+    try {
+      squareOrder = await fetchOrderForCustomer(id, profile.square_customer_id);
+    } catch (err) {
+      console.error("[portal/orders/:id] Square fetch failed:", err);
+      squareOrder = null;
+    }
 
-    const subtotal = moneyToDollars(squareOrder.total_money) * 100
-      - moneyToDollars(squareOrder.total_tax_money) * 100;
+    if (squareOrder) {
+      const subtotal = moneyToDollars(squareOrder.total_money) * 100
+        - moneyToDollars(squareOrder.total_tax_money) * 100;
 
-    order = {
-      id: squareOrder.id,
-      order_number: squareOrder.id.slice(-6).toUpperCase(),
-      status: squareStateToStatus(squareOrder.state),
-      payment_status:
-        (squareOrder.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
-      created_at: squareOrder.created_at ?? "",
-      subtotal_cents: Math.round(subtotal),
-      tax_cents: Math.round(
-        moneyToDollars(squareOrder.total_tax_money) * 100
-      ),
-      total_cents: Math.round(
-        moneyToDollars(squareOrder.total_money) * 100
-      ),
-      notes: null,
-      items:
-        squareOrder.line_items?.map((li, idx) => {
-          const qty = parseFloat(li.quantity ?? "0") || 0;
-          const unit = moneyToDollars(li.base_price_money);
-          const total = moneyToDollars(li.total_money || li.gross_sales_money);
-          return {
-            id: li.uid ?? `line-${idx}`,
-            name: li.name ?? "Item",
-            variation_name: li.variation_name,
-            quantity: qty,
-            unit_price_cents: Math.round(unit * 100),
-            total_cents: Math.round(total * 100),
-          };
-        }) ?? [],
-    };
-  } else {
-    // Supabase-backed fallback
+      order = {
+        id: squareOrder.id,
+        order_number: squareOrder.id.slice(-6).toUpperCase(),
+        status: squareStateToStatus(squareOrder.state),
+        payment_status:
+          (squareOrder.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
+        created_at: squareOrder.created_at ?? "",
+        subtotal_cents: Math.round(subtotal),
+        tax_cents: Math.round(
+          moneyToDollars(squareOrder.total_tax_money) * 100
+        ),
+        total_cents: Math.round(
+          moneyToDollars(squareOrder.total_money) * 100
+        ),
+        notes: null,
+        items:
+          squareOrder.line_items?.map((li, idx) => {
+            const qty = parseFloat(li.quantity ?? "0") || 0;
+            const unit = moneyToDollars(li.base_price_money);
+            const total = moneyToDollars(li.total_money || li.gross_sales_money);
+            return {
+              id: li.uid ?? `line-${idx}`,
+              name: li.name ?? "Item",
+              variation_name: li.variation_name,
+              quantity: qty,
+              unit_price_cents: Math.round(unit * 100),
+              total_cents: Math.round(total * 100),
+            };
+          }) ?? [],
+      };
+    }
+  }
+
+  // Supabase fallback — runs when:
+  //   - customer is not Square-linked, OR
+  //   - the requested id is a Supabase UUID (e.g. a portal-placed order)
+  if (!order) {
     const { data } = await supabase
       .from("orders")
       .select("*, order_items(*)")
