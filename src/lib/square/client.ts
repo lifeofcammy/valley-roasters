@@ -25,11 +25,18 @@ function getConfig() {
   return { token, locationId };
 }
 
+type SquareFetchInit = RequestInit & {
+  next?: { revalidate?: number; tags?: string[] };
+};
+
 async function squareFetch<T>(
   path: string,
-  init?: RequestInit
+  init?: SquareFetchInit
 ): Promise<T> {
   const { token } = getConfig();
+  // Default to no-store so customer-facing reads are always fresh.
+  // Callers can opt into Next.js cache by passing { next: { revalidate: N } }.
+  const hasCacheHint = Boolean(init?.next || init?.cache);
   const res = await fetch(`${SQUARE_BASE}${path}`, {
     ...init,
     headers: {
@@ -38,9 +45,7 @@ async function squareFetch<T>(
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
-    // Always server-side; opt out of Next caching for now so
-    // the portal reflects Square state in near real time.
-    cache: "no-store",
+    ...(hasCacheHint ? {} : { cache: "no-store" as const }),
   });
 
   if (!res.ok) {
@@ -176,7 +181,93 @@ export async function fetchCustomer(
   return data.customer ?? null;
 }
 
-/** Helpers to normalize Square money + state for display. */
+/* ------------------------------------------------------------- */
+/* Top sellers                                                   */
+/* ------------------------------------------------------------- */
+
+export type SquareTopItem = {
+  name: string;
+  qty_lbs: number;
+  orders_count: number;
+  revenue: number;
+  unit_price: number;
+};
+
+// Match coffee/bean SKUs and exclude prepared drinks/food.
+const COFFEE_KEYWORDS =
+  /\b(bean|whole bean|espresso|roast|blend|decaf|drip|coffee)\b/i;
+const COFFEE_EXCLUDE =
+  /(latte|cappuccino|mocha|cortado|americano|macchiato|cold brew|nitro|iced|burrito|sandwich|cookie|salad|croissant|wrap|bagel)/i;
+
+/**
+ * Aggregate Square order line items at Valley's location into a
+ * ranked list of top-selling coffee SKUs. Filters out prepared
+ * drinks and cafe food (Top Cup runs Valley as a multi-purpose
+ * Square location, so the raw order data has both).
+ *
+ * Cached for 1 hour by default — these stats don't need to be
+ * minute-fresh on the marketing homepage.
+ */
+export async function fetchTopSellingItems(
+  limit = 4,
+  options: { revalidateSeconds?: number; sampleSize?: number } = {}
+): Promise<SquareTopItem[]> {
+  const { locationId } = getConfig();
+  const body = {
+    location_ids: [locationId],
+    query: { sort: { sort_field: "CREATED_AT", sort_order: "DESC" } },
+    limit: options.sampleSize ?? 500,
+  };
+
+  const data = await squareFetch<{ orders?: SquareOrder[] }>(
+    "/v2/orders/search",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      next: { revalidate: options.revalidateSeconds ?? 3600 },
+    }
+  );
+
+  type Stats = { qty: number; revenue: number; orders: number; unit: number };
+  const agg = new Map<string, Stats>();
+
+  for (const order of data.orders ?? []) {
+    for (const li of order.line_items ?? []) {
+      const name = (li.name ?? "").trim();
+      if (!name) continue;
+      if (COFFEE_EXCLUDE.test(name)) continue;
+      if (!COFFEE_KEYWORDS.test(name)) continue;
+
+      const qty = parseFloat(li.quantity ?? "0") || 0;
+      const rev = moneyToDollars(li.total_money);
+      const unit = moneyToDollars(li.base_price_money);
+
+      const cur = agg.get(name) ?? { qty: 0, revenue: 0, orders: 0, unit: 0 };
+      cur.qty += qty;
+      cur.revenue += rev;
+      cur.orders += 1;
+      if (unit > 0) cur.unit = unit;
+      agg.set(name, cur);
+    }
+  }
+
+  return Array.from(agg.entries())
+    .sort((a, b) => b[1].qty - a[1].qty)
+    .slice(0, limit)
+    .map(([name, s]) => ({
+      name,
+      qty_lbs: Math.round(s.qty),
+      orders_count: s.orders,
+      revenue: Math.round(s.revenue * 100) / 100,
+      unit_price: s.unit,
+    }));
+}
+
+/* ------------------------------------------------------------- */
+/* Helpers                                                       */
+/* ------------------------------------------------------------- */
+
+/** Normalize Square money to dollars. */
 export function moneyToDollars(m?: SquareMoney | null): number {
   if (!m || typeof m.amount !== "number") return 0;
   return m.amount / 100;
