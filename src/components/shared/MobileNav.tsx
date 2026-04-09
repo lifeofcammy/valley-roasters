@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   RotateCcw,
   Settings,
+  Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -32,7 +33,8 @@ export type NavIconName =
   | "products"
   | "back"
   | "reorder"
-  | "settings";
+  | "settings"
+  | "subscriptions";
 
 const NAV_ICONS: Record<NavIconName, ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
@@ -43,6 +45,7 @@ const NAV_ICONS: Record<NavIconName, ComponentType<{ className?: string }>> = {
   back: ArrowLeft,
   reorder: RotateCcw,
   settings: Settings,
+  subscriptions: Repeat,
 };
 
 export interface MobileNavLink {

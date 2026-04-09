@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, ShoppingCart, Loader2 } from "lucide-react";
+import { Trash2, Plus, ShoppingCart, Loader2, Repeat } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -27,12 +27,14 @@ interface Product {
 }
 
 interface CartItem {
-  product_id: string;
+  product_id: string | null;
   product_name: string;
   size: string;
   quantity: number;
   unit_price_cents: number;
 }
+
+type Frequency = "weekly" | "biweekly" | "monthly";
 
 export default function ReorderPage() {
   const searchParams = useSearchParams();
@@ -45,9 +47,14 @@ export default function ReorderPage() {
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
 
+  const [makeRecurring, setMakeRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<Frequency>("biweekly");
+
   useEffect(() => {
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: prods } = await supabase
@@ -56,41 +63,49 @@ export default function ReorderPage() {
         .eq("is_active", true)
         .order("sort_order");
 
-      if (prods) {
-        const { data: pricing } = await supabase
-          .from("customer_pricing")
-          .select("product_id, price_cents");
+      const { data: pricing } = await supabase
+        .from("customer_pricing")
+        .select("product_id, price_cents");
 
-        const pricingMap = new Map(
-          pricing?.map((p) => [p.product_id, p.price_cents]) ?? []
-        );
+      const pricingMap = new Map(
+        pricing?.map((p) => [p.product_id, p.price_cents]) ?? []
+      );
 
-        const productsWithPricing = prods.map((p) => ({
-          ...p,
-          effective_price_cents: pricingMap.get(p.id) ?? p.base_price_cents,
-        }));
-        setProducts(productsWithPricing);
+      const productsWithPricing = (prods ?? []).map((p) => ({
+        ...p,
+        effective_price_cents: pricingMap.get(p.id) ?? p.base_price_cents,
+      }));
+      setProducts(productsWithPricing);
 
-        if (fromOrderId) {
-          const { data: order } = await supabase
-            .from("order_items")
-            .select("product_id, product_name, size, quantity, unit_price_cents")
-            .eq("order_id", fromOrderId);
-
-          if (order && order.length > 0) {
+      // Pre-fill cart from past order via the unified line-items API
+      // (handles both Square-backed and Supabase-backed customers)
+      if (fromOrderId) {
+        try {
+          const res = await fetch(
+            `/api/portal/order-line-items?id=${encodeURIComponent(fromOrderId)}`,
+            { credentials: "include" }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const items = (data.items ?? []) as Array<{
+              id: string;
+              name: string;
+              variation: string | null;
+              quantity: number;
+              unit_price_cents: number;
+            }>;
             setCart(
-              order.map((item) => ({
-                product_id: item.product_id,
-                product_name: item.product_name,
-                size: item.size,
-                quantity: item.quantity,
-                unit_price_cents:
-                  pricingMap.get(item.product_id) ??
-                  prods.find((p) => p.id === item.product_id)?.base_price_cents ??
-                  item.unit_price_cents,
+              items.map((it) => ({
+                product_id: null,
+                product_name: it.name,
+                size: it.variation ?? "1lb",
+                quantity: it.quantity,
+                unit_price_cents: it.unit_price_cents,
               }))
             );
           }
+        } catch {
+          // Pre-fill is best-effort; user can still build cart manually
         }
       }
 
@@ -111,7 +126,8 @@ export default function ReorderPage() {
         product_name: product.name,
         size: product.available_sizes?.[0] ?? "5lb",
         quantity: product.min_order_qty ?? 5,
-        unit_price_cents: product.effective_price_cents ?? product.base_price_cents,
+        unit_price_cents:
+          product.effective_price_cents ?? product.base_price_cents,
       },
     ]);
   }
@@ -142,14 +158,31 @@ export default function ReorderPage() {
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({
+          items: cart,
+          recurring: makeRecurring
+            ? { frequency, label: cart[0]?.product_name }
+            : null,
+        }),
       });
 
       const data = await res.json();
 
-      if (res.ok && data.orderId) {
-        toast.success("Order placed — we'll be in touch to confirm.");
-        router.push(`/portal/orders/${data.orderId}?placed=true`);
+      if (res.ok) {
+        if (makeRecurring) {
+          toast.success(
+            `Order placed and saved as a ${frequency} recurring order.`
+          );
+        } else {
+          toast.success("Order placed — we'll be in touch to confirm.");
+        }
+        if (data.orderId) {
+          router.push(`/portal/orders/${data.orderId}?placed=true`);
+        } else if (makeRecurring) {
+          router.push("/portal/subscriptions");
+        } else {
+          router.push("/portal/orders");
+        }
       } else {
         toast.error(data.error || "Could not place order. Please try again.");
         setPlacing(false);
@@ -192,28 +225,36 @@ export default function ReorderPage() {
           ) : (
             cart.map((item, index) => {
               const product = products.find((p) => p.id === item.product_id);
+              const sizeOptions = product?.available_sizes ?? [
+                "1lb",
+                "5lb",
+                "10lb",
+              ];
               return (
-                <Card key={`${item.product_id}-${index}`}>
+                <Card key={`${item.product_id ?? item.product_name}-${index}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold truncate">
                           {item.product_name}
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          ${(item.unit_price_cents / 100).toFixed(2)} / {product?.unit ?? "lb"}
+                          ${(item.unit_price_cents / 100).toFixed(2)} /{" "}
+                          {product?.unit ?? "lb"}
                         </p>
                       </div>
 
                       <Select
                         value={item.size}
-                        onValueChange={(v) => updateCartItem(index, { size: v ?? item.size })}
+                        onValueChange={(v) =>
+                          updateCartItem(index, { size: v ?? item.size })
+                        }
                       >
                         <SelectTrigger className="w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {product?.available_sizes?.map((size) => (
+                          {sizeOptions.map((size) => (
                             <SelectItem key={size} value={size}>
                               {size}
                             </SelectItem>
@@ -222,7 +263,9 @@ export default function ReorderPage() {
                       </Select>
 
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-muted-foreground">Qty:</label>
+                        <label className="text-sm text-muted-foreground">
+                          Qty:
+                        </label>
                         <Input
                           type="number"
                           min={1}
@@ -237,7 +280,8 @@ export default function ReorderPage() {
                       </div>
 
                       <p className="font-semibold w-24 text-right">
-                        ${((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
+                        $
+                        {((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
                       </p>
 
                       <Button
@@ -273,9 +317,12 @@ export default function ReorderPage() {
                       onClick={() => addProduct(product.id)}
                     >
                       <span className="text-left">
-                        <span className="font-medium block">{product.name}</span>
+                        <span className="font-medium block">
+                          {product.name}
+                        </span>
                         <span className="text-xs text-muted-foreground">
-                          ${(product.effective_price_cents! / 100).toFixed(2)} / {product.unit ?? "lb"}
+                          ${(product.effective_price_cents! / 100).toFixed(2)}{" "}
+                          / {product.unit ?? "lb"}
                         </span>
                       </span>
                       <Plus className="h-4 w-4 ml-2 flex-shrink-0" />
@@ -302,7 +349,8 @@ export default function ReorderPage() {
                       {item.product_name} x{item.quantity}
                     </span>
                     <span className="font-medium">
-                      ${((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
+                      $
+                      {((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
                     </span>
                   </div>
                 ))}
@@ -314,8 +362,51 @@ export default function ReorderPage() {
                   <span>${(subtotal / 100).toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  We&apos;ll confirm pricing, shipping, and payment after you place your order.
+                  We&apos;ll confirm pricing, shipping, and payment after you
+                  place your order.
                 </p>
+              </div>
+
+              {/* Recurring order toggle */}
+              <div className="border-t pt-4 space-y-3">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={makeRecurring}
+                    onChange={(e) => setMakeRecurring(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold flex items-center gap-1">
+                      <Repeat className="h-3.5 w-3.5" />
+                      Make this a recurring order
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-repeat the same items on a schedule. You can pause
+                      or cancel anytime.
+                    </p>
+                  </div>
+                </label>
+
+                {makeRecurring && (
+                  <div className="pl-6">
+                    <Select
+                      value={frequency}
+                      onValueChange={(v) =>
+                        setFrequency((v as Frequency) ?? "biweekly")
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Every week</SelectItem>
+                        <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                        <SelectItem value="monthly">Every month</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <Button
@@ -329,6 +420,8 @@ export default function ReorderPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Placing...
                   </>
+                ) : makeRecurring ? (
+                  "Place Order & Schedule"
                 ) : (
                   "Place Order"
                 )}

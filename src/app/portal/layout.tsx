@@ -5,6 +5,7 @@ import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
 const portalLinks: MobileNavLink[] = [
   { href: "/portal/orders", label: "Orders", icon: "orders" },
   { href: "/portal/reorder", label: "New Order", icon: "reorder" },
+  { href: "/portal/subscriptions", label: "Recurring", icon: "subscriptions" },
   { href: "/portal/account", label: "Account", icon: "settings" },
 ];
 

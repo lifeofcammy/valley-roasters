@@ -26,6 +26,9 @@ export default function AccountPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -81,6 +84,28 @@ export default function AccountPage() {
       toast.success("Profile updated successfully.");
     }
     setSaving(false);
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords don't match.");
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password updated. Use it next time you sign in.");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setPwSaving(false);
   }
 
   function updateField(field: keyof Profile, value: string) {
@@ -221,6 +246,50 @@ export default function AccountPage() {
         <Button type="submit" disabled={saving} className="w-full sm:w-auto">
           {saving ? "Saving..." : "Save Changes"}
         </Button>
+      </form>
+
+      {/* Password change — separate form so the profile Save button doesn't trigger it */}
+      <form onSubmit={handlePasswordChange} className="space-y-6 max-w-2xl mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Change Password</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new_password">New Password</Label>
+                <Input
+                  id="new_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={8}
+                  placeholder="At least 8 characters"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password">Confirm Password</Label>
+                <Input
+                  id="confirm_password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  minLength={8}
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              disabled={pwSaving || !newPassword || !confirmPassword}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              {pwSaving ? "Updating..." : "Update Password"}
+            </Button>
+          </CardContent>
+        </Card>
       </form>
     </div>
   );
