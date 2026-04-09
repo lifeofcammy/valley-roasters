@@ -274,6 +274,7 @@ export async function POST(request: Request) {
       square_order_id?: string;
       square_invoice_id?: string;
       square_invoice_public_url?: string;
+      square_invoice_status?: string;
     } = {};
 
     if (profile.square_customer_id && isSquareConfigured()) {
@@ -305,6 +306,7 @@ export async function POST(request: Request) {
           square_order_id: created.square_order_id,
           square_invoice_id: inv.square_invoice_id,
           square_invoice_public_url: inv.public_url,
+          square_invoice_status: (inv.status ?? "DRAFT").toUpperCase(),
         };
 
         const { error: updateError } = await adminSupabase

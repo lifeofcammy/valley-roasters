@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
+import { getDisplayStatus } from "@/lib/order-status";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -36,6 +36,7 @@ type NormalizedOrder = {
   order_number: string;
   status: string;
   payment_status: string;
+  square_invoice_status: string | null;
   created_at: string;
   subtotal_cents: number;
   tax_cents: number;
@@ -101,6 +102,7 @@ export default async function OrderDetailPage({
         status: squareStateToStatus(squareOrder.state),
         payment_status:
           (squareOrder.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
+        square_invoice_status: null,
         created_at: squareOrder.created_at ?? "",
         subtotal_cents: Math.round(subtotal),
         tax_cents: Math.round(
@@ -155,6 +157,7 @@ export default async function OrderDetailPage({
       order_number: String(data.order_number ?? ""),
       status: data.status ?? "pending",
       payment_status: data.payment_status ?? "unpaid",
+      square_invoice_status: (data.square_invoice_status as string | null) ?? null,
       created_at: data.created_at ?? "",
       subtotal_cents: data.subtotal_cents ?? 0,
       tax_cents: data.tax_cents ?? 0,
@@ -205,37 +208,24 @@ export default async function OrderDetailPage({
 
       {/* Status cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge
-              variant="secondary"
-              className={`text-sm ${
-                ORDER_STATUS_COLORS[order.status as OrderStatus]
-              }`}
-            >
-              {order.status}
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Payment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge
-              variant={order.payment_status === "paid" ? "default" : "secondary"}
-            >
-              {order.payment_status}
-            </Badge>
-          </CardContent>
-        </Card>
+        {(() => {
+          const d = getDisplayStatus(order);
+          return (
+            <Card className="sm:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Badge variant="secondary" className={`text-sm ${d.className}`}>
+                  {d.label}
+                </Badge>
+                <p className="text-xs text-muted-foreground">{d.description}</p>
+              </CardContent>
+            </Card>
+          );
+        })()}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">

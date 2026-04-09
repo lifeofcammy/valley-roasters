@@ -161,10 +161,14 @@ export default function ReorderPage() {
           toast.success(
             `Order placed and saved as a ${frequency} recurring order.`
           );
-          router.push("/portal/subscriptions");
+          router.push(
+            `/portal/subscriptions?placed=${encodeURIComponent(data.orderId ?? "")}`
+          );
         } else {
-          toast.success("Order placed — we'll be in touch to confirm.");
-          router.push("/portal/orders?placed=true");
+          toast.success("Order received — check your email for the invoice.");
+          router.push(
+            `/portal/orders/placed?id=${encodeURIComponent(data.orderId ?? "")}`
+          );
         }
       } else {
         toast.error(data.error || "Could not place order. Please try again.");

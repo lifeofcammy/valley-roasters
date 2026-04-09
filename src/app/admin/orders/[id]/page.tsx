@@ -28,6 +28,7 @@ import {
   type OrderStatus,
 } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
+import { displayStatusName } from "@/lib/order-status";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -194,6 +195,37 @@ export default async function AdminOrderDetailPage({
             </CardContent>
           </Card>
 
+          {/* Fix A — unmissable warning when order is unpaid */}
+          {order.payment_status !== "paid" && order.status !== "cancelled" && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-amber-700 dark:text-amber-400 text-2xl leading-none">
+                  ⚠️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200">
+                    Payment pending — do not fulfill this order yet
+                  </p>
+                  <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                    This order has not been paid. Wait for the Square invoice
+                    to be marked PAID before starting work on it. Fulfilling
+                    now means you might not get paid.
+                  </p>
+                  {order.square_invoice_public_url && (
+                    <a
+                      href={order.square_invoice_public_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-2 text-sm text-amber-900 dark:text-amber-200 underline hover:no-underline"
+                    >
+                      Check Square invoice status ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Status Update */}
           <Card>
             <CardHeader>
@@ -208,13 +240,38 @@ export default async function AdminOrderDetailPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {ORDER_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </SelectItem>
-                      ))}
+                      {ORDER_STATUSES.map((status) => {
+                        // Fix B — soft lock: fulfillment statuses are
+                        // disabled until payment has landed. The admin
+                        // can still override by toggling the "trust"
+                        // checkbox below the dropdown.
+                        const lockedWhenUnpaid = [
+                          "roasting",
+                          "shipped",
+                          "delivered",
+                        ];
+                        const locked =
+                          lockedWhenUnpaid.includes(status) &&
+                          order.payment_status !== "paid";
+                        return (
+                          <SelectItem
+                            key={status}
+                            value={status}
+                            disabled={locked}
+                          >
+                            {displayStatusName(status)}
+                            {locked ? " — payment pending" : ""}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+                  {order.payment_status !== "paid" && (
+                    <p className="text-xs text-muted-foreground">
+                      Fulfillment statuses unlock automatically once the
+                      Square invoice is paid.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Admin Notes</Label>
@@ -279,7 +336,7 @@ export default async function AdminOrderDetailPage({
                   variant="secondary"
                   className={ORDER_STATUS_COLORS[order.status as OrderStatus]}
                 >
-                  {order.status}
+                  {displayStatusName(order.status)}
                 </Badge>
               </div>
               <div className="flex justify-between items-center gap-2">

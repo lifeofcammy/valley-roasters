@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
+import { displayStatusName } from "@/lib/order-status";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 
@@ -69,7 +70,7 @@ export default async function AdminOrdersPage() {
                           ORDER_STATUS_COLORS[order.status as OrderStatus]
                         }
                       >
-                        {order.status}
+                        {displayStatusName(order.status)}
                       </Badge>
                       <Badge
                         variant={
@@ -138,7 +139,7 @@ export default async function AdminOrdersPage() {
                         variant="secondary"
                         className={ORDER_STATUS_COLORS[order.status as OrderStatus]}
                       >
-                        {order.status}
+                        {displayStatusName(order.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>

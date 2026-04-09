@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
+import { getDisplayStatus } from "@/lib/order-status";
 import { RotateCcw, Eye, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -28,6 +28,7 @@ type NormalizedOrder = {
   total_cents: number;
   status: string;
   payment_status: string;
+  square_invoice_status: string | null;
   item_count: number;
 };
 
@@ -77,6 +78,7 @@ export default async function OrdersPage() {
           status: squareStateToStatus(o.state),
           payment_status:
             (o.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
+          square_invoice_status: null,
           item_count:
             o.line_items?.reduce(
               (sum, li) => sum + (parseFloat(li.quantity ?? "0") || 0),
@@ -96,7 +98,7 @@ export default async function OrdersPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, status, payment_status, total_cents, created_at, order_items(count)"
+          "id, order_number, status, payment_status, total_cents, created_at, square_invoice_status, order_items(count)"
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false });
@@ -114,6 +116,7 @@ export default async function OrdersPage() {
           total_cents: o.total_cents ?? 0,
           status: o.status ?? "pending",
           payment_status: o.payment_status ?? "unpaid",
+          square_invoice_status: o.square_invoice_status ?? null,
           item_count:
             (o.order_items as { count: number }[] | null)?.[0]?.count ?? 0,
         }));
@@ -186,21 +189,16 @@ export default async function OrdersPage() {
                     {formatMoney(order.total_cents)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <Badge
-                    variant="secondary"
-                    className={ORDER_STATUS_COLORS[order.status as OrderStatus]}
-                  >
-                    {order.status}
-                  </Badge>
-                  <Badge
-                    variant={
-                      order.payment_status === "paid" ? "default" : "secondary"
-                    }
-                  >
-                    {order.payment_status}
-                  </Badge>
-                </div>
+                {(() => {
+                  const d = getDisplayStatus(order);
+                  return (
+                    <div className="mt-3">
+                      <Badge variant="secondary" className={d.className}>
+                        {d.label}
+                      </Badge>
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t">
                   <Link
                     href={`/portal/orders/${encodeURIComponent(order.id)}`}
@@ -235,7 +233,6 @@ export default async function OrdersPage() {
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -251,25 +248,14 @@ export default async function OrdersPage() {
                       {formatMoney(order.total_cents)}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          ORDER_STATUS_COLORS[order.status as OrderStatus]
-                        }
-                      >
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          order.payment_status === "paid"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {order.payment_status}
-                      </Badge>
+                      {(() => {
+                        const d = getDisplayStatus(order);
+                        return (
+                          <Badge variant="secondary" className={d.className}>
+                            {d.label}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
