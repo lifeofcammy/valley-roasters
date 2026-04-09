@@ -293,3 +293,148 @@ export function isSquareConfigured(): boolean {
     process.env.SQUARE_ACCESS_TOKEN && process.env.SQUARE_LOCATION_ID
   );
 }
+
+/* ------------------------------------------------------------- */
+/* Writers — create orders + invoices in Square                  */
+/* ------------------------------------------------------------- */
+
+export type CreateOrderLineItem = {
+  name: string;
+  quantity: number;
+  unit_price_cents: number;
+  note?: string;
+};
+
+export type CreatedSquareOrderResult = {
+  square_order_id: string;
+  total_cents: number;
+};
+
+/**
+ * Create a Square Order in state=OPEN with the given line items.
+ * Idempotency is keyed by a caller-supplied token so retries are safe.
+ */
+export async function createSquareOrder(args: {
+  squareCustomerId: string;
+  idempotencyKey: string;
+  lineItems: CreateOrderLineItem[];
+  referenceId?: string;
+  note?: string;
+}): Promise<CreatedSquareOrderResult> {
+  const { locationId } = getConfig();
+  const body = {
+    idempotency_key: args.idempotencyKey,
+    order: {
+      location_id: locationId,
+      customer_id: args.squareCustomerId,
+      reference_id: args.referenceId,
+      line_items: args.lineItems.map((li) => ({
+        name: li.name,
+        quantity: String(li.quantity),
+        base_price_money: {
+          amount: Math.round(li.unit_price_cents),
+          currency: "USD",
+        },
+        ...(li.note ? { note: li.note } : {}),
+      })),
+      state: "OPEN",
+      ...(args.note ? { note: args.note } : {}),
+    },
+  };
+
+  const data = await squareFetch<{ order?: SquareOrder }>("/v2/orders", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!data.order?.id) {
+    throw new Error("Square did not return a created order");
+  }
+  return {
+    square_order_id: data.order.id,
+    total_cents: data.order.total_money?.amount ?? 0,
+  };
+}
+
+export type CreatedSquareInvoiceResult = {
+  square_invoice_id: string;
+  public_url?: string;
+  status?: string;
+};
+
+/**
+ * Create a Square Invoice in DRAFT state, linked to an existing
+ * Square Order. The invoice is NOT auto-published — an admin must
+ * review and send it from the Square dashboard. This keeps the
+ * demo flow safe until Top Cup is ready to auto-send.
+ *
+ * When you want auto-send later, flip `publish: true`.
+ */
+export async function createSquareInvoice(args: {
+  squareOrderId: string;
+  squareCustomerId: string;
+  idempotencyKey: string;
+  dueDateIso: string; // yyyy-mm-dd
+  title?: string;
+  publish?: boolean;
+}): Promise<CreatedSquareInvoiceResult> {
+  const { locationId } = getConfig();
+
+  const body = {
+    idempotency_key: args.idempotencyKey,
+    invoice: {
+      location_id: locationId,
+      order_id: args.squareOrderId,
+      primary_recipient: { customer_id: args.squareCustomerId },
+      payment_requests: [
+        {
+          request_type: "BALANCE",
+          due_date: args.dueDateIso,
+        },
+      ],
+      delivery_method: "EMAIL",
+      accepted_payment_methods: {
+        card: true,
+        bank_account: true,
+        buy_now_pay_later: false,
+        square_gift_card: false,
+      },
+      title: args.title ?? "Valley Specialty Roasters Wholesale Invoice",
+      description:
+        "Thank you for your order. Pay online with card or ACH bank transfer.",
+    },
+  };
+
+  const data = await squareFetch<{
+    invoice?: { id?: string; public_url?: string; status?: string };
+  }>("/v2/invoices", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!data.invoice?.id) {
+    throw new Error("Square did not return a created invoice");
+  }
+
+  // Optionally publish the invoice so Square emails the customer.
+  if (args.publish) {
+    const pub = await squareFetch<{
+      invoice?: { id?: string; public_url?: string; status?: string };
+    }>(`/v2/invoices/${encodeURIComponent(data.invoice.id)}/publish`, {
+      method: "POST",
+      body: JSON.stringify({
+        version: 0,
+        idempotency_key: `${args.idempotencyKey}-publish`,
+      }),
+    });
+    return {
+      square_invoice_id: data.invoice.id,
+      public_url: pub.invoice?.public_url ?? data.invoice.public_url,
+      status: pub.invoice?.status ?? "UNPAID",
+    };
+  }
+
+  return {
+    square_invoice_id: data.invoice.id,
+    public_url: data.invoice.public_url,
+    status: data.invoice.status ?? "DRAFT",
+  };
+}

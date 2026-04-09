@@ -280,6 +280,42 @@ export default async function AdminOrderDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {(order.square_invoice_id || order.square_order_id) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">
+                  Square Invoice
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  This order was mirrored into Square as a draft invoice.
+                  Review and send it from Square to bill the customer.
+                </p>
+                {order.square_invoice_public_url && (
+                  <a
+                    href={order.square_invoice_public_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all block"
+                  >
+                    Open Invoice in Square ↗
+                  </a>
+                )}
+                {order.square_invoice_id && (
+                  <p className="text-xs text-muted-foreground break-all">
+                    Invoice ID: {order.square_invoice_id}
+                  </p>
+                )}
+                {order.square_order_id && (
+                  <p className="text-xs text-muted-foreground break-all">
+                    Order ID: {order.square_order_id}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

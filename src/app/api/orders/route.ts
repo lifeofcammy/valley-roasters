@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  createSquareInvoice,
+  createSquareOrder,
+  isSquareConfigured,
+} from "@/lib/square/client";
 
 interface CartItem {
   product_id: string | null;
@@ -22,7 +27,13 @@ function nextRunDate(frequency: Frequency): string {
   if (frequency === "weekly") d.setDate(d.getDate() + 7);
   else if (frequency === "biweekly") d.setDate(d.getDate() + 14);
   else d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10); // yyyy-mm-dd
+  return d.toISOString().slice(0, 10);
+}
+
+function net30DueDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().slice(0, 10);
 }
 
 export async function POST(request: Request) {
@@ -62,9 +73,8 @@ export async function POST(request: Request) {
 
     const adminSupabase = createAdminClient();
 
-    // For Supabase-product items, validate the price server-side via RPC.
-    // For Square items (product_id is null), trust the cart's unit_price_cents
-    // because they came from Square's authoritative order data.
+    // Validate Supabase-product prices server-side via RPC.
+    // Pass-through for Square items (product_id null).
     const validatedItems: CartItem[] = [];
     for (const item of items) {
       if (item.product_id) {
@@ -80,7 +90,6 @@ export async function POST(request: Request) {
         }
         validatedItems.push({ ...item, unit_price_cents: effectivePrice });
       } else {
-        // Square-sourced item — pass through.
         validatedItems.push(item);
       }
     }
@@ -90,6 +99,7 @@ export async function POST(request: Request) {
       0
     );
 
+    // 1. Save order in Supabase (system of record for the portal UI)
     const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
@@ -117,7 +127,7 @@ export async function POST(request: Request) {
     await adminSupabase.from("order_items").insert(
       validatedItems.map((item) => ({
         order_id: order.id,
-        product_id: item.product_id, // may be null for Square items
+        product_id: item.product_id,
         product_name: item.product_name,
         quantity: item.quantity,
         size: item.size,
@@ -126,7 +136,63 @@ export async function POST(request: Request) {
       }))
     );
 
-    // Save recurring subscription if requested
+    // 2. If the customer is linked to Square, mirror the order +
+    //    create a DRAFT invoice in Square so Top Cup sees it in
+    //    their dashboard alongside POS sales. Invoice is NOT
+    //    auto-published — admin reviews and sends from Square.
+    let squareResult: {
+      square_order_id?: string;
+      square_invoice_id?: string;
+      square_invoice_public_url?: string;
+    } = {};
+
+    if (profile.square_customer_id && isSquareConfigured()) {
+      try {
+        const created = await createSquareOrder({
+          squareCustomerId: profile.square_customer_id,
+          idempotencyKey: `portal-order-${order.id}`,
+          referenceId: String(order.order_number),
+          note: `Valley portal order #${order.order_number}`,
+          lineItems: validatedItems.map((it) => ({
+            name: it.product_name,
+            quantity: it.quantity,
+            unit_price_cents: it.unit_price_cents,
+          })),
+        });
+
+        const inv = await createSquareInvoice({
+          squareOrderId: created.square_order_id,
+          squareCustomerId: profile.square_customer_id,
+          idempotencyKey: `portal-invoice-${order.id}`,
+          dueDateIso: net30DueDate(),
+          title: `Valley Order #${order.order_number}`,
+          publish: false, // admin reviews in Square dashboard before sending
+        });
+
+        squareResult = {
+          square_order_id: created.square_order_id,
+          square_invoice_id: inv.square_invoice_id,
+          square_invoice_public_url: inv.public_url,
+        };
+
+        await adminSupabase
+          .from("orders")
+          .update(squareResult)
+          .eq("id", order.id);
+      } catch (squareError) {
+        // Square failure must NOT block the order — the Supabase
+        // row is still valid and admin can create the invoice
+        // manually. Log it for visibility.
+        console.error(
+          "Square order/invoice creation failed:",
+          squareError instanceof Error
+            ? squareError.message
+            : String(squareError)
+        );
+      }
+    }
+
+    // 3. Optional recurring subscription
     let subscriptionId: string | null = null;
     if (recurring && recurring.frequency) {
       const { data: sub, error: subError } = await adminSupabase
@@ -149,6 +215,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       orderId: order.id,
       subscriptionId,
+      ...squareResult,
     });
   } catch (error) {
     console.error("Order creation error:", error);
