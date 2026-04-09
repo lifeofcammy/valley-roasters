@@ -108,7 +108,7 @@ export async function POST(request: Request) {
         subtotal_cents: subtotalCents,
         tax_cents: 0,
         total_cents: subtotalCents,
-        payment_status: "invoice_pending",
+        payment_status: "unpaid",
         shipping_address_line1: profile.company_address_line1,
         shipping_city: profile.company_city,
         shipping_state: profile.company_state,
