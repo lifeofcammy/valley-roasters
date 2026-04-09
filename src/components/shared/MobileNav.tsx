@@ -217,7 +217,7 @@ export function MobileNav({
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden sm:flex sm:flex-col sm:w-64 bg-foreground text-background flex-shrink-0 min-h-screen">
+      <aside className="hidden sm:flex sm:flex-col sm:w-64 bg-foreground text-background flex-shrink-0 sticky top-0 h-screen max-h-screen overflow-y-auto">
         {navBody}
       </aside>
     </>
