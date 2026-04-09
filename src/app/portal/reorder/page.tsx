@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, ShoppingCart, Loader2, Repeat } from "lucide-react";
+import { Trash2, ShoppingCart, Loader2, Repeat } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -114,23 +114,6 @@ export default function ReorderPage() {
 
     loadData();
   }, [fromOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function addProduct(productId: string) {
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
-
-    setCart((prev) => [
-      ...prev,
-      {
-        product_id: product.id,
-        product_name: product.name,
-        size: product.available_sizes?.[0] ?? "5lb",
-        quantity: product.min_order_qty ?? 5,
-        unit_price_cents:
-          product.effective_price_cents ?? product.base_price_cents,
-      },
-    ]);
-  }
 
   function updateCartItem(index: number, updates: Partial<CartItem>) {
     setCart((prev) =>
@@ -298,39 +281,12 @@ export default function ReorderPage() {
             })
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add Product
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {products
-                  .filter((p) => !cart.some((c) => c.product_id === p.id))
-                  .map((product) => (
-                    <Button
-                      key={product.id}
-                      variant="outline"
-                      className="justify-between h-auto py-3 px-4"
-                      onClick={() => addProduct(product.id)}
-                    >
-                      <span className="text-left">
-                        <span className="font-medium block">
-                          {product.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          ${(product.effective_price_cents! / 100).toFixed(2)}{" "}
-                          / {product.unit ?? "lb"}
-                        </span>
-                      </span>
-                      <Plus className="h-4 w-4 ml-2 flex-shrink-0" />
-                    </Button>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
+          {cart.length > 0 && (
+            <p className="text-xs text-muted-foreground px-1">
+              Need to change what&apos;s in this order? Contact us and
+              we&apos;ll update it.
+            </p>
+          )}
         </div>
 
         <div>
