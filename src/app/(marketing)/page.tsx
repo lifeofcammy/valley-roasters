@@ -212,16 +212,8 @@ export default async function HomePage() {
                       {item.qty_lbs.toLocaleString()} lbs sold to wholesale
                       partners
                     </p>
-                    <div className="flex items-baseline gap-1 mt-4">
-                      <span className="font-display text-2xl font-bold text-primary">
-                        ${item.unit_price.toFixed(2)}
-                      </span>
-                      <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                        / lb
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2 uppercase tracking-wider font-medium">
-                      {item.orders_count} wholesale orders
+                    <p className="text-xs text-muted-foreground mt-4 uppercase tracking-wider font-medium">
+                      Wholesale pricing available in your portal
                     </p>
                   </div>
                 </div>

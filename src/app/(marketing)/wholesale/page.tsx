@@ -146,7 +146,6 @@ export default async function WholesalePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
             {[
               {
-                step: "01",
                 icon: ClipboardList,
                 title: "Apply & Get Approved",
                 description:
@@ -154,7 +153,6 @@ export default async function WholesalePage() {
                 delay: "fade-up-on-scroll",
               },
               {
-                step: "02",
                 icon: DollarSign,
                 title: "Browse & Order",
                 description:
@@ -162,7 +160,6 @@ export default async function WholesalePage() {
                 delay: "fade-up-delay-1",
               },
               {
-                step: "03",
                 icon: RotateCcw,
                 title: "Reorder with One Click",
                 description:
@@ -170,11 +167,10 @@ export default async function WholesalePage() {
                 delay: "fade-up-delay-2",
               },
             ].map((item) => (
-              <div key={item.step} className={`text-center ${item.delay}`}>
+              <div key={item.title} className={`text-center ${item.delay}`}>
                 <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/10 mb-5 sm:mb-6 ring-4 ring-primary/5">
                   <item.icon className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                 </div>
-                <p className="text-sm font-bold text-primary mb-2 tracking-widest">{item.step}</p>
                 <h3 className="font-display text-xl sm:text-2xl font-semibold mb-3">
                   {item.title}
                 </h3>
