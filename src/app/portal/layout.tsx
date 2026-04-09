@@ -27,15 +27,19 @@ export default async function PortalLayout({
     .eq("id", user.id)
     .single();
 
-  const links: MobileNavLink[] = [...portalLinks];
+  // For admins viewing the customer portal, prepend a prominent
+  // "Back to Admin" link at the very top of the sidebar so they
+  // never get stranded in the customer view.
+  const links: MobileNavLink[] = [];
   if (profile?.role === "admin") {
     links.push({
       href: "/admin",
-      label: "Admin Dashboard",
-      icon: "settings",
+      label: "← Back to Admin",
+      icon: "back",
       variant: "accent",
     });
   }
+  links.push(...portalLinks);
 
   return (
     <div className="min-h-screen flex flex-col sm:flex-row">
