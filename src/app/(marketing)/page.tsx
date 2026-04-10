@@ -236,13 +236,10 @@ export default async function HomePage() {
             className="rounded-full mx-auto mb-8 sm:mb-10 shadow-lg w-[100px] h-[100px] sm:w-[120px] sm:h-[120px]"
           />
           <h2 className="font-display text-3xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
-            Ready to Elevate Your
+            Join Our Family of
             <br />
-            <span className="text-primary">Coffee Program?</span>
+            <span className="text-primary">Wholesale Partners</span>
           </h2>
-          <p className="mt-5 sm:mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Join our growing family of wholesale partners across Arizona.
-          </p>
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/contact" className="w-full sm:w-auto">
               <Button
