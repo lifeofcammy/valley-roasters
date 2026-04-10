@@ -242,7 +242,7 @@ export default async function HomePage() {
           <h2 className="font-display text-3xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
             Join Our Family of
             <br />
-            <span className="text-primary">Wholesale Partners</span>
+            <span className="text-primary">Wholesale Customers</span>
           </h2>
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/contact" className="w-full sm:w-auto">
