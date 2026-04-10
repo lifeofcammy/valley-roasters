@@ -165,15 +165,10 @@ export default async function WholesalePage() {
               ordering portal, and coffee roasted fresh when you order it.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Link href="/register" className="w-full sm:w-auto">
-                <Button size="lg" className="btn-lift w-full sm:w-auto bg-primary hover:bg-primary/90 text-white text-base sm:text-lg px-8 py-6 font-semibold shadow-lg shadow-primary/25">
-                  Apply for Wholesale Access
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
               <Link href="/contact" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="btn-lift w-full sm:w-auto bg-transparent border-2 border-white/40 text-white hover:bg-white/15 hover:border-white/70 hover:text-white text-base sm:text-lg px-8 py-6 font-semibold backdrop-blur-sm">
+                <Button size="lg" className="btn-lift w-full sm:w-auto bg-primary hover:bg-primary/90 text-white text-base sm:text-lg px-8 py-6 font-semibold shadow-lg shadow-primary/25">
                   Contact Us
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -293,9 +288,9 @@ export default async function WholesalePage() {
           )}
 
           <div className="text-center mt-12 sm:mt-16 fade-up-on-scroll">
-            <Link href="/register">
+            <Link href="/contact">
               <Button size="lg" className="btn-lift bg-primary hover:bg-primary/90 text-white font-semibold">
-                Apply Now
+                Contact Us
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

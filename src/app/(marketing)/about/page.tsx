@@ -174,9 +174,9 @@ export default function AboutPage() {
             We&apos;d love to supply your business with exceptional coffee.
           </p>
           <div className="mt-8">
-            <Link href="/register">
+            <Link href="/contact">
               <Button size="lg" className="btn-lift bg-primary hover:bg-primary/90 text-white font-semibold px-8">
-                Apply for Wholesale
+                Contact Us
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

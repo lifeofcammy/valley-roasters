@@ -244,22 +244,13 @@ export default async function HomePage() {
             Join our growing family of wholesale partners across Arizona.
           </p>
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register" className="w-full sm:w-auto">
+            <Link href="/contact" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 className="btn-lift w-full sm:w-auto bg-primary hover:bg-primary/90 text-white text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-semibold shadow-lg shadow-primary/25"
               >
-                Apply for Wholesale Access
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/contact" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                variant="outline"
-                className="btn-lift w-full sm:w-auto text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-semibold"
-              >
                 Contact Us
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
           </div>

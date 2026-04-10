@@ -199,12 +199,9 @@ export default function ContactPage() {
                   Interested in Wholesale?
                 </h3>
                 <p className="text-muted-foreground mb-4 text-sm sm:text-base">
-                  Apply for a wholesale account to access our full catalog
-                  with custom pricing.
+                  Interested in wholesale? Reach out and we&apos;ll get you set up
+                  with custom pricing for your business.
                 </p>
-                <a href="/register">
-                  <Button variant="outline" className="btn-lift">Apply Now</Button>
-                </a>
               </div>
             </div>
           </div>
