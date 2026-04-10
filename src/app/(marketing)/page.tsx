@@ -184,7 +184,7 @@ export default async function HomePage() {
             <div className="relative fade-up-delay-1">
               <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden shadow-xl">
                 <Image
-                  src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800&q=85"
+                  src="https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=800&q=85"
                   alt="Specialty grade coffee beans"
                   fill
                   className="object-cover"
