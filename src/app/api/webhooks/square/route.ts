@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let payload: SquareInvoiceWebhookPayload;
+  let payload: SquareWebhookPayload;
   try {
     payload = JSON.parse(rawBody) as SquareWebhookPayload;
   } catch {
