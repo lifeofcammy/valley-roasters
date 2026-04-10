@@ -95,8 +95,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[60vh] lg:min-h-[70vh]">
           <div className="flex items-center px-6 sm:px-12 lg:px-20 py-16 sm:py-20 bg-white order-2 lg:order-1 fade-up-on-scroll">
             <div className="max-w-lg">
-              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">01</span>
-              <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mt-4 mb-5">
+              <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mb-5">
                 Small-Batch Roasted
               </h3>
               <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
@@ -131,8 +130,7 @@ export default async function HomePage() {
           </div>
           <div className="flex items-center px-6 sm:px-12 lg:px-20 py-16 sm:py-20 bg-secondary text-secondary-foreground fade-up-on-scroll">
             <div className="max-w-lg">
-              <span className="text-primary font-bold text-6xl sm:text-7xl font-display leading-none">02</span>
-              <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mt-4 mb-5">
+              <h3 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold mb-5">
                 Effortless Ordering
               </h3>
               <p className="text-base sm:text-lg text-secondary-foreground/70 leading-relaxed">
