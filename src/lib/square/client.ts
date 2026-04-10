@@ -473,6 +473,53 @@ export function isSquareConfigured(): boolean {
 }
 
 /* ------------------------------------------------------------- */
+/* Writers — create customers in Square                          */
+/* ------------------------------------------------------------- */
+
+export type CreateSquareCustomerArgs = {
+  companyName: string;
+  givenName: string;
+  emailAddress: string;
+  phoneNumber?: string;
+  idempotencyKey: string;
+};
+
+export type CreatedSquareCustomerResult = {
+  square_customer_id: string;
+};
+
+/**
+ * Create a new customer in Square. Used by admin "Add Customer" flow
+ * so that the Square customer record exists before the Supabase profile.
+ */
+export async function createSquareCustomer(
+  args: CreateSquareCustomerArgs
+): Promise<CreatedSquareCustomerResult> {
+  const body: Record<string, string> = {
+    idempotency_key: args.idempotencyKey,
+    company_name: args.companyName,
+    given_name: args.givenName,
+    email_address: args.emailAddress,
+  };
+  if (args.phoneNumber) {
+    body.phone_number = args.phoneNumber;
+  }
+
+  const data = await squareFetch<{ customer?: SquareCustomer }>(
+    "/v2/customers",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!data.customer?.id) {
+    throw new Error("Square did not return a created customer");
+  }
+  return { square_customer_id: data.customer.id };
+}
+
+/* ------------------------------------------------------------- */
 /* Writers — create orders + invoices in Square                  */
 /* ------------------------------------------------------------- */
 

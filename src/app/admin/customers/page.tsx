@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Eye } from "lucide-react";
 import { format } from "date-fns";
+import { AddCustomerDialog } from "./add-customer-dialog";
 
 export default async function AdminCustomersPage() {
   const supabase = await createClient();
@@ -23,9 +24,12 @@ export default async function AdminCustomersPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">
-        Customers
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6 sm:mb-8">
+        <h1 className="font-display text-2xl sm:text-3xl font-bold">
+          Customers
+        </h1>
+        <AddCustomerDialog />
+      </div>
 
       {!customers || customers.length === 0 ? (
         <p className="text-muted-foreground text-center py-16">

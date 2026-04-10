@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -12,7 +13,7 @@ import {
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { displayStatusName } from "@/lib/order-status";
 import { format } from "date-fns";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Repeat, CalendarClock } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
@@ -20,8 +21,37 @@ interface PageProps {
   searchParams: Promise<{ page?: string }>;
 }
 
+interface ActiveSubscription {
+  id: string;
+  frequency: "weekly" | "biweekly" | "monthly";
+  next_run_date: string | null;
+  items: Array<{
+    product_name: string;
+    quantity: number;
+    unit_price_cents: number;
+  }> | null;
+  profiles: { company_name: string } | null;
+}
+
+function formatFrequency(f: string): string {
+  if (f === "weekly") return "Weekly";
+  if (f === "biweekly") return "Every 2 wks";
+  if (f === "monthly") return "Monthly";
+  return f;
+}
+
 export default async function AdminOrdersPage({ searchParams }: PageProps) {
   const supabase = await createClient();
+  const admin = createAdminClient();
+
+  // Fetch active recurring subscriptions
+  const { data: activeSubscriptions } = await admin
+    .from("order_subscriptions")
+    .select("id, frequency, next_run_date, items, profiles(company_name)")
+    .eq("status", "active")
+    .order("next_run_date", { ascending: true });
+
+  const subs = (activeSubscriptions ?? []) as unknown as ActiveSubscription[];
 
   // Resolve current page from ?page=N (1-indexed). Clamp to >= 1.
   const sp = await searchParams;
@@ -58,6 +88,110 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
           </p>
         )}
       </div>
+
+      {/* Active Recurring Subscriptions — compact summary */}
+      {subs.length > 0 && (
+        <details className="mb-6 border rounded-lg bg-card group">
+          <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none hover:bg-muted/60 transition-colors rounded-lg text-sm font-medium">
+            <Repeat className="h-4 w-4 text-primary flex-shrink-0" />
+            <span>
+              {subs.length} Active Recurring Order{subs.length !== 1 ? "s" : ""}
+            </span>
+            <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+          </summary>
+          <div className="border-t">
+            {/* Mobile list */}
+            <div className="md:hidden divide-y">
+              {subs.map((sub) => {
+                const total = (sub.items ?? []).reduce(
+                  (sum, it) => sum + (it.unit_price_cents ?? 0) * (it.quantity ?? 0),
+                  0
+                );
+                return (
+                  <Link
+                    key={sub.id}
+                    href="/admin/subscriptions"
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">
+                        {sub.profiles?.company_name ?? "Unknown"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <Badge variant="outline" className="text-xs">
+                          {formatFrequency(sub.frequency)}
+                        </Badge>
+                        {sub.next_run_date && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <CalendarClock className="h-3 w-3" />
+                            {format(new Date(sub.next_run_date), "MMM d")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-semibold text-sm whitespace-nowrap">
+                      ${(total / 100).toFixed(2)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Frequency</TableHead>
+                    <TableHead>Next Run</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subs.map((sub) => {
+                    const total = (sub.items ?? []).reduce(
+                      (sum, it) =>
+                        sum + (it.unit_price_cents ?? 0) * (it.quantity ?? 0),
+                      0
+                    );
+                    return (
+                      <TableRow key={sub.id}>
+                        <TableCell>
+                          <Link
+                            href="/admin/subscriptions"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {sub.profiles?.company_name ?? "Unknown"}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{formatFrequency(sub.frequency)}</TableCell>
+                        <TableCell>
+                          {sub.next_run_date
+                            ? format(new Date(sub.next_run_date), "MMM d, yyyy")
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ${(total / 100).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="default"
+                            className="bg-green-600/90 text-white hover:bg-green-600"
+                          >
+                            Active
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </details>
+      )}
 
       {!orders || orders.length === 0 ? (
         <p className="text-muted-foreground text-center py-16">No orders yet.</p>
