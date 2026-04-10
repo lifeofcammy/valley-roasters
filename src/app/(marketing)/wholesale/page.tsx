@@ -58,7 +58,7 @@ const faqItems = [
 ];
 
 const coffeeImages = [
-  "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=500&q=80",
+  "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=500&q=80",
   "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=500&q=80",
   "https://images.unsplash.com/photo-1498804103079-a6351b050096?w=500&q=80",
   "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=500&q=80",
