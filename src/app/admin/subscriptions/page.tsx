@@ -81,6 +81,7 @@ export default async function AdminSubscriptionsPage() {
       .eq("id", id)
       .maybeSingle();
 
+    let squareOk = true;
     if (current?.square_subscription_id) {
       const { isSquareConfigured, pauseSquareSubscription, resumeSquareSubscription, cancelSquareSubscription } = await import("@/lib/square/client");
       if (isSquareConfigured()) {
@@ -93,15 +94,18 @@ export default async function AdminSubscriptionsPage() {
             await cancelSquareSubscription(current.square_subscription_id);
           }
         } catch (err) {
-          console.error("admin setStatus — Square call failed:", err);
+          squareOk = false;
+          console.error("admin setStatus — Square refused:", err);
         }
       }
     }
 
-    await supa
-      .from("order_subscriptions")
-      .update({ status, updated_at: new Date().toISOString(), last_synced_at: new Date().toISOString() })
-      .eq("id", id);
+    if (squareOk) {
+      await supa
+        .from("order_subscriptions")
+        .update({ status, updated_at: new Date().toISOString(), last_synced_at: new Date().toISOString() })
+        .eq("id", id);
+    }
 
     revalidatePath("/admin/subscriptions");
   }

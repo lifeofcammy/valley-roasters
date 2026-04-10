@@ -79,7 +79,11 @@ export default async function SubscriptionsPage() {
       .maybeSingle();
 
     // If Square has a subscription for this row, drive Square first.
-    // Our Supabase row then gets the new status + a last_synced_at.
+    // CRITICAL: only update our local mirror if Square accepted the
+    // change. If Square refuses (e.g. PENDING sub can't be paused),
+    // leave the mirror untouched so the two stay in sync. The next
+    // page revalidate just shows the unchanged state.
+    let squareOk = true;
     if (current?.square_subscription_id) {
       const { isSquareConfigured, pauseSquareSubscription, resumeSquareSubscription, cancelSquareSubscription } = await import("@/lib/square/client");
       if (isSquareConfigured()) {
@@ -92,21 +96,23 @@ export default async function SubscriptionsPage() {
             await cancelSquareSubscription(current.square_subscription_id);
           }
         } catch (err) {
-          console.error("portal setStatus — Square call failed:", err);
-          // Still fall through and update our mirror so the UI isn't stuck.
+          squareOk = false;
+          console.error("portal setStatus — Square refused:", err);
         }
       }
     }
 
-    await supa
-      .from("order_subscriptions")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-        last_synced_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("profile_id", actor.id);
+    if (squareOk) {
+      await supa
+        .from("order_subscriptions")
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .eq("profile_id", actor.id);
+    }
 
     revalidatePath("/portal/subscriptions");
   }
