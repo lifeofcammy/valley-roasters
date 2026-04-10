@@ -149,7 +149,10 @@ export default async function AdminCatalogHighlightsPage() {
       throw new Error("Failed to save highlights: " + error.message);
     }
 
-    revalidateTag("valley-catalog");
+    // Next.js 16: revalidateTag requires a cache profile as the
+    // second arg. 'max' opts into stale-while-revalidate so the next
+    // visitor still gets a response while we refetch in the background.
+    revalidateTag("valley-catalog", "max");
     revalidatePath("/admin/products");
     revalidatePath("/wholesale");
   }
