@@ -264,6 +264,182 @@ export async function fetchTopSellingItems(
 }
 
 /* ------------------------------------------------------------- */
+/* Coffee catalog (live SKUs from Square)                        */
+/* ------------------------------------------------------------- */
+
+/**
+ * One variation of a coffee item (e.g. "5 lb bag", "Whole Bean").
+ * `price_cents` is the variation's fixed price; 0 if Square has it
+ * marked variable-price.
+ */
+export type SquareCoffeeVariation = {
+  id: string;
+  name: string;
+  price_cents: number;
+};
+
+/**
+ * A single coffee SKU as it appears in Valley's Square catalog.
+ * The id is the Square catalog object id (used as the FK from
+ * our `catalog_highlights` table).
+ */
+export type SquareCoffeeItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  primary_image_url: string | null;
+  variations: SquareCoffeeVariation[];
+};
+
+// Keyword list for the catalog filter — broader than the top-sellers
+// filter because here we want to surface ALL coffee SKUs even if their
+// names don't include "bean" or "roast" explicitly.
+const COFFEE_CATALOG_KEYWORDS =
+  /\b(roast|brazil|honduras|guatemala|ethiopia|colombia|sumatra|kenya|decaf|espresso|drip|whole bean|bean|blend|coffee)\b/i;
+
+// Top Cup uses "TC" as a prefix on internal-only SKUs that should
+// never show up on Valley's site.
+function isTopCupInternal(name: string): boolean {
+  return /^tc[\s-]/i.test(name.trim()) || /^tc\d/i.test(name.trim());
+}
+
+type SquareCatalogObject = {
+  id: string;
+  type: string;
+  is_deleted?: boolean;
+  item_data?: {
+    name?: string;
+    description?: string;
+    description_plaintext?: string;
+    image_ids?: string[];
+    variations?: Array<{
+      id: string;
+      type: string;
+      item_variation_data?: {
+        name?: string;
+        price_money?: { amount?: number; currency?: string };
+        pricing_type?: string;
+      };
+    }>;
+  };
+  image_data?: {
+    url?: string;
+    name?: string;
+  };
+};
+
+/**
+ * Fetch all coffee items from Valley's Square catalog. Filters to
+ * coffee SKUs by name keyword and skips Top Cup internal items.
+ *
+ * Cached for 1 hour with the `valley-catalog` tag — call
+ * `revalidateTag('valley-catalog')` to bust early when needed.
+ *
+ * Image lookup: `image_ids` only gives us object ids, so we batch
+ * the unique ones and fetch them via `/v2/catalog/batch-retrieve`
+ * (single round trip). Items without an image return null and the
+ * caller should fall back to a placeholder.
+ */
+export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
+  const { locationId } = getConfig();
+
+  // 1. Search the catalog for ITEMs that are enabled at our location.
+  // search-catalog-items only returns ITEM-type objects (variations
+  // are nested), so this is exactly what we want.
+  const searchBody = {
+    enabled_location_ids: [locationId],
+    limit: 100,
+  };
+
+  const allItems: SquareCatalogObject[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const data = await squareFetch<{
+      items?: SquareCatalogObject[];
+      cursor?: string;
+    }>("/v2/catalog/search-catalog-items", {
+      method: "POST",
+      body: JSON.stringify(cursor ? { ...searchBody, cursor } : searchBody),
+      next: { revalidate: 3600, tags: ["valley-catalog"] },
+    });
+    if (data.items) allItems.push(...data.items);
+    cursor = data.cursor;
+  } while (cursor);
+
+  // 2. Filter to coffee items.
+  const coffeeItems = allItems.filter((obj) => {
+    if (obj.type !== "ITEM") return false;
+    if (obj.is_deleted) return false;
+    const name = obj.item_data?.name ?? "";
+    if (!name) return false;
+    if (isTopCupInternal(name)) return false;
+    return COFFEE_CATALOG_KEYWORDS.test(name);
+  });
+
+  // 3. Collect unique image ids and batch-fetch their URLs in one call.
+  const imageIds = new Map<string, string>(); // first image id per item
+  const allImageIds = new Set<string>();
+  for (const obj of coffeeItems) {
+    const ids = obj.item_data?.image_ids ?? [];
+    if (ids.length > 0) {
+      imageIds.set(obj.id, ids[0]);
+      allImageIds.add(ids[0]);
+    }
+  }
+
+  const imageUrlById = new Map<string, string>();
+  if (allImageIds.size > 0) {
+    try {
+      const data = await squareFetch<{ objects?: SquareCatalogObject[] }>(
+        "/v2/catalog/batch-retrieve",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            object_ids: Array.from(allImageIds),
+            include_related_objects: false,
+          }),
+          next: { revalidate: 3600, tags: ["valley-catalog"] },
+        }
+      );
+      for (const obj of data.objects ?? []) {
+        if (obj.type === "IMAGE" && obj.image_data?.url) {
+          imageUrlById.set(obj.id, obj.image_data.url);
+        }
+      }
+    } catch {
+      // Image fetches are best-effort; missing images fall back to
+      // the placeholder list on the wholesale page.
+    }
+  }
+
+  // 4. Shape into the public type.
+  return coffeeItems.map<SquareCoffeeItem>((obj) => {
+    const variations = (obj.item_data?.variations ?? []).map((v) => ({
+      id: v.id,
+      name: v.item_variation_data?.name ?? "",
+      price_cents: v.item_variation_data?.price_money?.amount ?? 0,
+    }));
+
+    const firstImageId = imageIds.get(obj.id);
+    const primary_image_url = firstImageId
+      ? imageUrlById.get(firstImageId) ?? null
+      : null;
+
+    return {
+      id: obj.id,
+      name: obj.item_data?.name ?? "",
+      description:
+        obj.item_data?.description_plaintext ??
+        obj.item_data?.description ??
+        null,
+      primary_image_url,
+      variations,
+    };
+  });
+}
+
+/* ------------------------------------------------------------- */
 /* Helpers                                                       */
 /* ------------------------------------------------------------- */
 

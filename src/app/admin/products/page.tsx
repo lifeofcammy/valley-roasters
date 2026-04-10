@@ -1,402 +1,342 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { redirect } from "next/navigation";
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { fetchCoffeeCatalog, type SquareCoffeeItem } from "@/lib/square/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ROAST_LEVELS } from "@/lib/constants";
-import { Plus, Pencil } from "lucide-react";
-import { toast } from "sonner";
 
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  origin: string;
-  roast_level: string;
-  flavor_notes: string[];
-  process: string;
-  base_price_cents: number;
-  unit: string;
-  min_order_qty: number;
-  available_sizes: string[];
-  is_active: boolean;
+export const dynamic = "force-dynamic";
+
+type HighlightRow = {
+  square_catalog_object_id: string;
+  is_featured: boolean;
   sort_order: number;
-}
-
-const emptyProduct: Omit<Product, "id"> = {
-  name: "",
-  slug: "",
-  description: "",
-  origin: "",
-  roast_level: "medium",
-  flavor_notes: [],
-  process: "",
-  base_price_cents: 0,
-  unit: "lb",
-  min_order_qty: 5,
-  available_sizes: ["5lb", "25lb", "50lb"],
-  is_active: true,
-  sort_order: 0,
+  marketing_description: string | null;
 };
 
-export default function AdminProductsPage() {
-  const supabase = createClient();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [editing, setEditing] = useState<Partial<Product> | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [flavorInput, setFlavorInput] = useState("");
+async function assertAdmin() {
+  const s = await createClient();
+  const {
+    data: { user },
+  } = await s.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  const { data: p } = await s
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (p?.role !== "admin") throw new Error("Forbidden");
+  return user;
+}
 
-  useEffect(() => {
-    loadProducts();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+function variationsLabel(item: SquareCoffeeItem): string {
+  if (!item.variations.length) return "—";
+  return item.variations
+    .map((v) => {
+      const price =
+        v.price_cents > 0 ? ` ($${(v.price_cents / 100).toFixed(2)})` : "";
+      return `${v.name || "Default"}${price}`;
+    })
+    .join(", ");
+}
 
-  async function loadProducts() {
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .order("sort_order");
-    if (data) setProducts(data);
+export default async function AdminCatalogHighlightsPage() {
+  // Layout already gates this route, but keep a defensive check.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (profile?.role !== "admin") redirect("/portal/orders");
+
+  // Pull every coffee SKU from Square (live) and overlay highlights from Supabase.
+  let catalog: SquareCoffeeItem[] = [];
+  let catalogError: string | null = null;
+  try {
+    catalog = await fetchCoffeeCatalog();
+  } catch (e) {
+    catalogError = e instanceof Error ? e.message : String(e);
   }
 
-  function openNew() {
-    setEditing({ ...emptyProduct });
-    setFlavorInput("");
-    setDialogOpen(true);
-  }
+  const admin = createAdminClient();
+  const { data: highlightsData } = await admin
+    .from("catalog_highlights")
+    .select("square_catalog_object_id, is_featured, sort_order, marketing_description");
+  const highlights = (highlightsData ?? []) as HighlightRow[];
+  const highlightById = new Map<string, HighlightRow>(
+    highlights.map((h) => [h.square_catalog_object_id, h])
+  );
 
-  function openEdit(product: Product) {
-    setEditing({ ...product });
-    setFlavorInput(product.flavor_notes?.join(", ") || "");
-    setDialogOpen(true);
-  }
+  // Sort: featured first (by sort_order), then everything else alphabetically.
+  const rows = [...catalog].sort((a, b) => {
+    const ha = highlightById.get(a.id);
+    const hb = highlightById.get(b.id);
+    const fa = ha?.is_featured ? 0 : 1;
+    const fb = hb?.is_featured ? 0 : 1;
+    if (fa !== fb) return fa - fb;
+    if (ha?.is_featured && hb?.is_featured) {
+      return (ha.sort_order ?? 0) - (hb.sort_order ?? 0);
+    }
+    return a.name.localeCompare(b.name);
+  });
 
-  async function handleSave() {
-    if (!editing?.name) return;
+  async function saveHighlights(formData: FormData) {
+    "use server";
+    await assertAdmin();
 
-    const slug =
-      editing.slug ||
-      editing.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
+    // Form contains a parallel set of fields per item:
+    //   id_<idx>            -> square_catalog_object_id
+    //   featured_<idx>      -> "on" if checked, missing otherwise
+    //   sort_<idx>          -> integer
+    //   marketing_<idx>     -> textarea string (may be empty)
+    // We collect rows by parsing the id_* keys, then upsert all of them.
+    const idEntries = Array.from(formData.entries()).filter(([k]) =>
+      k.startsWith("id_")
+    );
 
-    const payload = {
-      name: editing.name,
-      slug,
-      description: editing.description || "",
-      origin: editing.origin || "",
-      roast_level: editing.roast_level || "medium",
-      flavor_notes: flavorInput
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      process: editing.process || "",
-      base_price_cents: editing.base_price_cents || 0,
-      unit: editing.unit || "lb",
-      min_order_qty: editing.min_order_qty || 5,
-      available_sizes: editing.available_sizes || ["5lb", "25lb", "50lb"],
-      is_active: editing.is_active ?? true,
-      sort_order: editing.sort_order || 0,
+    type Upsert = {
+      square_catalog_object_id: string;
+      is_featured: boolean;
+      sort_order: number;
+      marketing_description: string | null;
+      updated_at: string;
     };
+    const updates: Upsert[] = [];
+    const now = new Date().toISOString();
 
-    if (editing.id) {
-      const { error } = await supabase
-        .from("products")
-        .update(payload)
-        .eq("id", editing.id);
-      if (error) {
-        toast.error("Failed to update product.");
-        return;
-      }
-      toast.success("Product updated.");
-    } else {
-      const { error } = await supabase.from("products").insert(payload);
-      if (error) {
-        toast.error("Failed to create product.");
-        return;
-      }
-      toast.success("Product created.");
+    for (const [key, value] of idEntries) {
+      const idx = key.slice(3); // strip "id_"
+      const id = String(value);
+      if (!id) continue;
+      const featured = formData.get(`featured_${idx}`) === "on";
+      const sortRaw = formData.get(`sort_${idx}`);
+      const sortNum =
+        typeof sortRaw === "string" && sortRaw.length > 0
+          ? parseInt(sortRaw, 10)
+          : 0;
+      const marketingRaw = formData.get(`marketing_${idx}`);
+      const marketing =
+        typeof marketingRaw === "string" && marketingRaw.trim().length > 0
+          ? marketingRaw.trim()
+          : null;
+
+      updates.push({
+        square_catalog_object_id: id,
+        is_featured: featured,
+        sort_order: Number.isFinite(sortNum) ? sortNum : 0,
+        marketing_description: marketing,
+        updated_at: now,
+      });
     }
 
-    setDialogOpen(false);
-    setEditing(null);
-    loadProducts();
+    if (updates.length === 0) {
+      return;
+    }
+
+    const a = createAdminClient();
+    const { error } = await a
+      .from("catalog_highlights")
+      .upsert(updates, { onConflict: "square_catalog_object_id" });
+    if (error) {
+      throw new Error("Failed to save highlights: " + error.message);
+    }
+
+    revalidateTag("valley-catalog");
+    revalidatePath("/admin/products");
+    revalidatePath("/wholesale");
   }
+
+  const featuredCount = rows.filter(
+    (r) => highlightById.get(r.id)?.is_featured
+  ).length;
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
+      <div className="mb-6 sm:mb-8">
         <h1 className="font-display text-2xl sm:text-3xl font-bold">
-          Products
+          Catalog Highlights
         </h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger
-            render={
-              <Button onClick={openNew} size="sm" className="sm:size-default">
-                <Plus className="sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Add Product</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            }
-          />
-          <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[90vh] overflow-y-auto sm:w-full">
-            <DialogHeader>
-              <DialogTitle className="font-display">
-                {editing?.id ? "Edit Product" : "Add Product"}
-              </DialogTitle>
-            </DialogHeader>
-            {editing && (
-              <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      value={editing.name || ""}
-                      onChange={(e) =>
-                        setEditing((p) => ({ ...p, name: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Origin</Label>
-                    <Input
-                      value={editing.origin || ""}
-                      onChange={(e) =>
-                        setEditing((p) => ({ ...p, origin: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={editing.description || ""}
-                    onChange={(e) =>
-                      setEditing((p) => ({
-                        ...p,
-                        description: e.target.value,
-                      }))
-                    }
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Roast Level</Label>
-                    <Select
-                      value={editing.roast_level || "medium"}
-                      onValueChange={(v) =>
-                        setEditing((p) =>
-                          p ? { ...p, roast_level: v ?? "medium" } : p
-                        )
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROAST_LEVELS.map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {level}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Process</Label>
-                    <Input
-                      value={editing.process || ""}
-                      onChange={(e) =>
-                        setEditing((p) => ({ ...p, process: e.target.value }))
-                      }
-                      placeholder="Washed, Natural..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Base Price ($/lb)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      inputMode="decimal"
-                      value={
-                        editing.base_price_cents
-                          ? (editing.base_price_cents / 100).toFixed(2)
-                          : ""
-                      }
-                      onChange={(e) =>
-                        setEditing((p) => ({
-                          ...p,
-                          base_price_cents: Math.round(
-                            parseFloat(e.target.value) * 100
-                          ),
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Flavor Notes (comma-separated)</Label>
-                  <Input
-                    value={flavorInput}
-                    onChange={(e) => setFlavorInput(e.target.value)}
-                    placeholder="Chocolate, Caramel, Walnut"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Min Order Qty</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={editing.min_order_qty || 5}
-                      onChange={(e) =>
-                        setEditing((p) => ({
-                          ...p,
-                          min_order_qty: parseInt(e.target.value),
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sort Order</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={editing.sort_order || 0}
-                      onChange={(e) =>
-                        setEditing((p) => ({
-                          ...p,
-                          sort_order: parseInt(e.target.value),
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSave} className="w-full">
-                  {editing.id ? "Save Changes" : "Create Product"}
-                </Button>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        <p className="text-sm text-muted-foreground mt-1">
+          {featuredCount} featured of {rows.length} coffee SKUs in your Square
+          catalog.
+        </p>
       </div>
 
-      {/* Mobile card list */}
-      <div className="md:hidden space-y-3">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className="border rounded-lg p-4 bg-card"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-base truncate">
-                  {product.name}
-                </p>
-                {product.origin && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {product.origin}
-                  </p>
-                )}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => openEdit(product)}
-                aria-label={`Edit ${product.name}`}
-                className="h-11 w-11 flex-shrink-0"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
-              <span className="text-sm">
-                <span className="font-medium">
-                  ${(product.base_price_cents / 100).toFixed(2)}
-                </span>
-                <span className="text-muted-foreground">/lb</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  &middot; {product.roast_level}
-                </span>
-              </span>
-              <Badge variant={product.is_active ? "default" : "secondary"}>
-                {product.is_active ? "Active" : "Inactive"}
-              </Badge>
-            </div>
+      {/* Big amber banner explaining the new flow */}
+      <div className="mb-8 rounded-xl border border-amber-300 bg-amber-50 p-5 sm:p-6 text-amber-950 shadow-sm">
+        <p className="font-display text-lg sm:text-xl font-bold mb-2">
+          Catalog Highlights
+        </p>
+        <p className="text-sm sm:text-base leading-relaxed">
+          These are your highlights for the public Wholesale page. The actual
+          coffee catalog is managed in <strong>Square</strong> — add or remove
+          SKUs there and they&apos;ll auto-sync within an hour.
+        </p>
+        <p className="text-sm sm:text-base leading-relaxed mt-2">
+          Use this page to choose which SKUs to feature on{" "}
+          <strong>valleyspecialtyroasters.com/wholesale</strong> and to write
+          marketing-friendly descriptions that override the Square description.
+        </p>
+      </div>
+
+      {catalogError && (
+        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          Failed to load Square catalog: {catalogError}
+        </div>
+      )}
+
+      {rows.length === 0 && !catalogError && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          No coffee SKUs found in your Square catalog. Add items in Square and
+          they&apos;ll appear here within an hour.
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <form action={saveHighlights} className="space-y-4">
+          <div className="flex items-center justify-between gap-3 sticky top-0 bg-background/95 backdrop-blur z-10 py-3 -mx-1 px-1 border-b">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Tick the SKUs you want featured on /wholesale, then click Save.
+            </p>
+            <Button type="submit" size="sm" className="sm:size-default">
+              Save All
+            </Button>
           </div>
-        ))}
-      </div>
 
-      {/* Desktop table */}
-      <div className="hidden md:block border rounded-lg overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Origin</TableHead>
-              <TableHead>Roast</TableHead>
-              <TableHead>Base Price</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.origin}</TableCell>
-                <TableCell>{product.roast_level}</TableCell>
-                <TableCell>
-                  ${(product.base_price_cents / 100).toFixed(2)}/lb
-                </TableCell>
-                <TableCell>
-                  <Badge variant={product.is_active ? "default" : "secondary"}>
-                    {product.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openEdit(product)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          <div className="space-y-3">
+            {rows.map((item, idx) => {
+              const highlight = highlightById.get(item.id);
+              const isFeatured = highlight?.is_featured ?? false;
+              const sortOrder = highlight?.sort_order ?? 0;
+              const marketing = highlight?.marketing_description ?? "";
+              const fallbackDescription =
+                item.description?.trim() ?? "(no description in Square)";
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm"
+                >
+                  <input
+                    type="hidden"
+                    name={`id_${idx}`}
+                    value={item.id}
+                  />
+
+                  <div className="flex flex-col md:flex-row md:items-start gap-4">
+                    {/* Image / placeholder */}
+                    <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                      {item.primary_image_url ? (
+                        <Image
+                          src={item.primary_image_url}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                          No image
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-base sm:text-lg leading-tight">
+                            {item.name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-1 break-all">
+                            {item.id}
+                          </p>
+                        </div>
+                        {isFeatured && (
+                          <Badge className="bg-primary text-white">
+                            Featured
+                          </Badge>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-2">
+                        <span className="font-medium text-foreground">
+                          Square description:
+                        </span>{" "}
+                        {fallbackDescription}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <span className="font-medium text-foreground">
+                          Variations:
+                        </span>{" "}
+                        {variationsLabel(item)}
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-4">
+                        <label className="md:col-span-3 flex items-center gap-2 text-sm select-none">
+                          <input
+                            type="checkbox"
+                            name={`featured_${idx}`}
+                            defaultChecked={isFeatured}
+                            className="h-4 w-4 rounded border-input accent-primary"
+                          />
+                          <span className="font-medium">Featured</span>
+                        </label>
+
+                        <div className="md:col-span-3">
+                          <label
+                            htmlFor={`sort_${idx}`}
+                            className="block text-xs font-medium text-muted-foreground mb-1"
+                          >
+                            Sort order
+                          </label>
+                          <input
+                            id={`sort_${idx}`}
+                            name={`sort_${idx}`}
+                            type="number"
+                            inputMode="numeric"
+                            defaultValue={sortOrder}
+                            className="w-full h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                          />
+                        </div>
+
+                        <div className="md:col-span-6">
+                          <label
+                            htmlFor={`marketing_${idx}`}
+                            className="block text-xs font-medium text-muted-foreground mb-1"
+                          >
+                            Marketing description (overrides Square)
+                          </label>
+                          <textarea
+                            id={`marketing_${idx}`}
+                            name={`marketing_${idx}`}
+                            defaultValue={marketing}
+                            rows={2}
+                            placeholder="Optional — leave blank to use the Square description"
+                            className="w-full min-h-16 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit">Save All</Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

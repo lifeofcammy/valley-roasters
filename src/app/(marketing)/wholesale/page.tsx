@@ -3,7 +3,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { fetchCoffeeCatalog, type SquareCoffeeItem } from "@/lib/square/client";
 import { ArrowRight, ClipboardList, DollarSign, RotateCcw } from "lucide-react";
+
+type HighlightRow = {
+  square_catalog_object_id: string;
+  is_featured: boolean;
+  sort_order: number;
+  marketing_description: string | null;
+};
 
 export const metadata: Metadata = {
   title: "Wholesale Coffee Program",
@@ -60,13 +68,54 @@ const coffeeImages = [
   "https://images.unsplash.com/photo-1524350876685-274059332603?w=500&q=80",
 ];
 
+type FeaturedCoffee = {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string | null;
+  sort_order: number;
+};
+
 export default async function WholesalePage() {
   const supabase = await createClient();
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order");
+
+  // Live Square catalog joined with our highlights table.
+  // Highlights live in Supabase (admin-curated) — Square is the
+  // source of truth for what SKUs exist. If a featured SKU is
+  // removed in Square, it just disappears from this page.
+  let catalog: SquareCoffeeItem[] = [];
+  try {
+    catalog = await fetchCoffeeCatalog();
+  } catch {
+    catalog = [];
+  }
+
+  const { data: highlightRows } = await supabase
+    .from("catalog_highlights")
+    .select("square_catalog_object_id, is_featured, sort_order, marketing_description");
+  const highlights = (highlightRows ?? []) as HighlightRow[];
+  const highlightById = new Map<string, HighlightRow>(
+    highlights.map((h) => [h.square_catalog_object_id, h])
+  );
+
+  const featured: FeaturedCoffee[] = catalog
+    .map((item) => {
+      const h = highlightById.get(item.id);
+      if (!h?.is_featured) return null;
+      const description =
+        (h.marketing_description && h.marketing_description.trim()) ||
+        item.description?.trim() ||
+        "";
+      return {
+        id: item.id,
+        name: item.name,
+        description,
+        imageUrl: item.primary_image_url,
+        sort_order: h.sort_order ?? 0,
+      } satisfies FeaturedCoffee;
+    })
+    .filter((x): x is FeaturedCoffee => x !== null)
+    .sort((a, b) => a.sort_order - b.sort_order);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -198,10 +247,12 @@ export default async function WholesalePage() {
             </p>
           </div>
 
-          {products && products.length > 0 ? (
+          {featured.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-              {products.map((product, index) => {
+              {featured.map((product, index) => {
                 const delayClasses = ["fade-up-on-scroll", "fade-up-delay-1", "fade-up-delay-2", "fade-up-delay-3"];
+                const imgSrc = product.imageUrl ?? coffeeImages[index % coffeeImages.length];
+                const useUnoptimized = Boolean(product.imageUrl);
                 return (
                   <div
                     key={product.id}
@@ -209,40 +260,25 @@ export default async function WholesalePage() {
                   >
                     <div className="relative h-56 overflow-hidden">
                       <Image
-                        src={coffeeImages[index % coffeeImages.length]}
+                        src={imgSrc}
                         alt={product.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-700"
+                        unoptimized={useUnoptimized}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      <div className="absolute top-4 left-4">
-                        <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                          {product.origin}
-                        </span>
-                      </div>
                     </div>
                     <div className="p-5 sm:p-6">
-                      <p className="text-xs font-medium text-primary uppercase tracking-wider">
-                        {product.roast_level} roast
-                      </p>
                       <h3 className="font-display text-lg sm:text-xl font-bold mt-1 group-hover:text-primary transition-colors">
                         {product.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
-                        {product.description}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {product.flavor_notes?.slice(0, 3).map((note: string) => (
-                          <span
-                            key={note}
-                            className="text-xs px-2.5 py-1 bg-muted rounded-full text-foreground/60 font-medium"
-                          >
-                            {note}
-                          </span>
-                        ))}
-                      </div>
+                      {product.description && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-3 leading-relaxed">
+                          {product.description}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground mt-4 border-t border-border pt-3">
-                        Available: {product.available_sizes?.join(", ")}
+                        Available in 5lb, 25lb, and 50lb bags
                       </p>
                     </div>
                   </div>

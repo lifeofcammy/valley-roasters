@@ -8,7 +8,7 @@ const adminLinks: MobileNavLink[] = [
   { href: "/admin/subscriptions", label: "Recurring", icon: "subscriptions" },
   { href: "/admin/messages", label: "Messages", icon: "messages" },
   { href: "/admin/customers", label: "Customers", icon: "customers" },
-  { href: "/admin/products", label: "Products", icon: "products" },
+  { href: "/admin/products", label: "Catalog Highlights", icon: "products" },
   { href: "/admin/settings", label: "Settings", icon: "settings" },
 ];
 
