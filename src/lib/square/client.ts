@@ -59,13 +59,6 @@ async function squareFetch<T>(
 }
 
 
-/** Test order IDs to hide from the customer portal (created during dev testing). */
-const HIDDEN_ORDER_IDS = new Set([
-  "sNFzrRJP5NOn8fZsj4hnAOgDGtOZY",
-  "Get8AQKrweM6Pvhru16lByffsN7YY",
-  "IZuK4nICywWwjIooonMi0RJeA9dZY",
-  "Mdj6pK40GuvCDzbS8YgOQrpMT7GZY",
-]);
 
 export type SquareMoney = {
   amount?: number;
@@ -156,7 +149,7 @@ export async function fetchCustomerOrders(
     { method: "POST", body: JSON.stringify(body) }
   );
 
-  return (data.orders ?? []).filter((o: SquareOrder) => !HIDDEN_ORDER_IDS.has(o.id));
+  return data.orders ?? [];
 }
 
 /**

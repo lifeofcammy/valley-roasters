@@ -7,8 +7,6 @@ import { ImpersonationProvider } from "@/components/shared/ImpersonationProvider
 
 const portalLinks: MobileNavLink[] = [
   { href: "/portal/orders", label: "Orders", icon: "orders" },
-  { href: "/portal/reorder", label: "New Order", icon: "reorder" },
-  { href: "/portal/subscriptions", label: "Recurring", icon: "subscriptions" },
   { href: "/portal/account", label: "Account", icon: "settings" },
 ];
 

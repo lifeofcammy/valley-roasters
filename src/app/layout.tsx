@@ -35,6 +35,10 @@ export const metadata: Metadata = {
     "small batch coffee",
     "premium coffee wholesale",
   ],
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",

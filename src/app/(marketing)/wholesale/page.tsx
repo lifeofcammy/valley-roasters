@@ -233,7 +233,7 @@ export default async function WholesalePage() {
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground fade-up-on-scroll">
-              <p className="text-lg">Our full catalog is loading — check back soon.</p>
+              <p className="text-lg">We're updating our catalog. Contact us for current offerings.</p>
               <p className="mt-2 text-sm">Or <Link href="/contact" className="text-primary hover:underline">contact us</Link> for current offerings.</p>
             </div>
           )}

@@ -8,6 +8,15 @@ import {
   type SquareTopItem,
 } from "@/lib/square/client";
 
+
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Valley Specialty Roasters | Wholesale Coffee Roasted to Order",
+  description:
+    "Organic, specialty-grade wholesale coffee roasted in small batches in Gilbert, Arizona. Custom blends, sustainable sourcing, and dedicated wholesale support for cafes and restaurants.",
+};
+
 export default async function HomePage() {
   // Pull Valley's actual top-selling coffee SKUs from Square (cached 1h)
   let topSellers: SquareTopItem[] = [];

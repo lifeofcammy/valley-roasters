@@ -11,6 +11,15 @@ import { Mail, MapPin, CheckCircle2 } from "lucide-react";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
+
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Contact Us | Valley Specialty Roasters",
+  description:
+    "Get in touch with Valley Specialty Roasters. Wholesale inquiries, custom blend requests, and general questions. Based in Gilbert, Arizona.",
+};
+
 export default function ContactPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
