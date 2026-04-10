@@ -5,7 +5,6 @@ import { MobileNav, type MobileNavLink } from "@/components/shared/MobileNav";
 const adminLinks: MobileNavLink[] = [
   { href: "/admin", label: "Dashboard", icon: "dashboard" },
   { href: "/admin/orders", label: "Orders", icon: "orders" },
-  { href: "/admin/subscriptions", label: "Recurring", icon: "subscriptions" },
   { href: "/admin/messages", label: "Messages", icon: "messages" },
   { href: "/admin/customers", label: "Customers", icon: "customers" },
   { href: "/admin/products", label: "Products", icon: "products" },
