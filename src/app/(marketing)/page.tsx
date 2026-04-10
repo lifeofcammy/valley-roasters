@@ -210,9 +210,6 @@ export default async function HomePage() {
                       {item.qty_lbs.toLocaleString()} lbs sold to wholesale
                       partners
                     </p>
-                    <p className="text-xs text-muted-foreground mt-4 uppercase tracking-wider font-medium">
-                      Wholesale pricing available in your portal
-                    </p>
                   </div>
                 </div>
               );

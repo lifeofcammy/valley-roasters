@@ -293,9 +293,6 @@ export default async function WholesalePage() {
           )}
 
           <div className="text-center mt-12 sm:mt-16 fade-up-on-scroll">
-            <p className="text-muted-foreground mb-4 text-base sm:text-lg">
-              Wholesale pricing is available in your portal after approval.
-            </p>
             <Link href="/register">
               <Button size="lg" className="btn-lift bg-primary hover:bg-primary/90 text-white font-semibold">
                 Apply Now
