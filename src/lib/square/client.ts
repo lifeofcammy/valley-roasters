@@ -482,25 +482,26 @@ export async function createSquareSubscriptionPlan(args: {
   totalAmountCents: number;
   idempotencyKey: string;
 }): Promise<CreatedSquarePlan> {
-  const { locationId } = getConfig();
+  // (Square requires SUBSCRIPTION_PLAN to be present at all locations,
+  // so we don't need locationId in the body itself.)
   const planName = `[Valley Portal] ${args.label}`;
   const variationName = `${args.frequency} ($${(args.totalAmountCents / 100).toFixed(2)})`;
 
+  // NOTE: Square does NOT allow location-scoping on SUBSCRIPTION_PLAN
+  // catalog objects — they must be present at all locations. Trying to
+  // pass present_at_location_ids returns INVALID_REQUEST. So we omit
+  // both flags and Square defaults present_at_all_locations to true.
   const body = {
     idempotency_key: args.idempotencyKey,
     object: {
       type: "SUBSCRIPTION_PLAN",
       id: "#plan",
-      present_at_all_locations: false,
-      present_at_location_ids: [locationId],
       subscription_plan_data: {
         name: planName,
         subscription_plan_variations: [
           {
             type: "SUBSCRIPTION_PLAN_VARIATION",
             id: "#variation",
-            present_at_all_locations: false,
-            present_at_location_ids: [locationId],
             subscription_plan_variation_data: {
               name: variationName,
               phases: [
