@@ -438,3 +438,203 @@ export async function createSquareInvoice(args: {
     status: data.invoice.status ?? "DRAFT",
   };
 }
+
+/* ====================================================================
+ * SUBSCRIPTIONS — Square-native recurring orders for wholesale (NET-30)
+ * --------------------------------------------------------------------
+ * Flow:
+ *   1. Create a Catalog SUBSCRIPTION_PLAN object (one per recurring
+ *      schedule) with exactly one SUBSCRIPTION_PLAN_VARIATION whose
+ *      phase uses STATIC pricing = total amount of the cart.
+ *   2. Subscribe the Square customer to that plan variation via
+ *      POST /v2/subscriptions. No card on file — Square auto-generates
+ *      an invoice for each billing period (which goes through the same
+ *      DRAFT/PUBLISHED flow as one-off invoices).
+ *   3. Pause / Resume / Cancel from the portal via the *action* endpoints.
+ *
+ * Why this design: zero cron on our side, zero infrastructure we have
+ * to babysit. Square runs the schedule forever. Top Cup sees every
+ * recurring wholesaler in their normal Square dashboard.
+ * ================================================================== */
+
+export type SubscriptionFrequency = "weekly" | "biweekly" | "monthly";
+
+/** Map our human frequency to Square's Catalog cadence enum. */
+function toSquareCadence(f: SubscriptionFrequency): string {
+  if (f === "weekly") return "WEEKLY";
+  if (f === "biweekly") return "EVERY_TWO_WEEKS";
+  return "MONTHLY";
+}
+
+export type CreatedSquarePlan = {
+  square_plan_id: string;
+  square_plan_variation_id: string;
+};
+
+/**
+ * Create a one-off Catalog SUBSCRIPTION_PLAN + one PLAN_VARIATION with
+ * STATIC pricing. The plan name is prefixed with "[Valley Portal]" so
+ * Top Cup can filter these out of their manual catalog view.
+ */
+export async function createSquareSubscriptionPlan(args: {
+  label: string;
+  frequency: SubscriptionFrequency;
+  totalAmountCents: number;
+  idempotencyKey: string;
+}): Promise<CreatedSquarePlan> {
+  const { locationId } = getConfig();
+  const planName = `[Valley Portal] ${args.label}`;
+  const variationName = `${args.frequency} ($${(args.totalAmountCents / 100).toFixed(2)})`;
+
+  const body = {
+    idempotency_key: args.idempotencyKey,
+    object: {
+      type: "SUBSCRIPTION_PLAN",
+      id: "#plan",
+      present_at_all_locations: false,
+      present_at_location_ids: [locationId],
+      subscription_plan_data: {
+        name: planName,
+        subscription_plan_variations: [
+          {
+            type: "SUBSCRIPTION_PLAN_VARIATION",
+            id: "#variation",
+            present_at_all_locations: false,
+            present_at_location_ids: [locationId],
+            subscription_plan_variation_data: {
+              name: variationName,
+              phases: [
+                {
+                  cadence: toSquareCadence(args.frequency),
+                  ordinal: 0,
+                  pricing: {
+                    type: "STATIC",
+                    price_money: {
+                      amount: Math.round(args.totalAmountCents),
+                      currency: "USD",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  };
+
+  const data = await squareFetch<{
+    catalog_object?: {
+      id?: string;
+      subscription_plan_data?: {
+        subscription_plan_variations?: Array<{ id?: string }>;
+      };
+    };
+  }>("/v2/catalog/object", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  const planId = data.catalog_object?.id;
+  const variationId =
+    data.catalog_object?.subscription_plan_data?.subscription_plan_variations?.[0]
+      ?.id;
+  if (!planId || !variationId) {
+    throw new Error("Square did not return a plan + variation id");
+  }
+  return {
+    square_plan_id: planId,
+    square_plan_variation_id: variationId,
+  };
+}
+
+export type CreatedSquareSubscription = {
+  square_subscription_id: string;
+  status: string;
+  charged_through_date?: string;
+};
+
+/**
+ * Subscribe a Square customer to a plan variation. No card on file —
+ * Square will auto-generate an invoice for each billing period.
+ *
+ * `startDate` must be >= today (yyyy-mm-dd). If omitted, today is used.
+ */
+export async function createSquareSubscription(args: {
+  squareCustomerId: string;
+  planVariationId: string;
+  idempotencyKey: string;
+  startDate?: string;
+}): Promise<CreatedSquareSubscription> {
+  const { locationId } = getConfig();
+  const body = {
+    idempotency_key: args.idempotencyKey,
+    location_id: locationId,
+    plan_variation_id: args.planVariationId,
+    customer_id: args.squareCustomerId,
+    ...(args.startDate ? { start_date: args.startDate } : {}),
+    source: { name: "Valley Portal" },
+  };
+
+  const data = await squareFetch<{
+    subscription?: {
+      id?: string;
+      status?: string;
+      charged_through_date?: string;
+    };
+  }>("/v2/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  if (!data.subscription?.id) {
+    throw new Error("Square did not return a created subscription");
+  }
+  return {
+    square_subscription_id: data.subscription.id,
+    status: data.subscription.status ?? "ACTIVE",
+    charged_through_date: data.subscription.charged_through_date,
+  };
+}
+
+/** Pause an active subscription. Safe to call on already-paused subs. */
+export async function pauseSquareSubscription(
+  subscriptionId: string
+): Promise<void> {
+  await squareFetch(
+    `/v2/subscriptions/${encodeURIComponent(subscriptionId)}/pause`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+/** Resume a paused subscription. */
+export async function resumeSquareSubscription(
+  subscriptionId: string
+): Promise<void> {
+  await squareFetch(
+    `/v2/subscriptions/${encodeURIComponent(subscriptionId)}/resume`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
+
+/**
+ * Cancel a subscription. Square marks it CANCELED effective at the end
+ * of the current billing period (standard behavior — no partial refunds).
+ */
+export async function cancelSquareSubscription(
+  subscriptionId: string
+): Promise<void> {
+  await squareFetch(
+    `/v2/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}

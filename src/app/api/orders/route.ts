@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createSquareInvoice,
   createSquareOrder,
+  createSquareSubscription,
+  createSquareSubscriptionPlan,
   isSquareConfigured,
 } from "@/lib/square/client";
 
@@ -327,27 +329,79 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Optional recurring subscription
+    // 4. Optional recurring subscription — native Square Subscription.
+    //    If the customer is Square-linked AND recurring is requested, we:
+    //      a) Create a Catalog SUBSCRIPTION_PLAN with one STATIC-priced
+    //         variation (total = subtotalCents).
+    //      b) Subscribe the customer to that plan variation.
+    //      c) Mirror the Square subscription into our Supabase
+    //         order_subscriptions table for fast reads in the portal.
+    //    Square runs the schedule internally — no cron needed.
     let subscriptionId: string | null = null;
     let subscriptionError: string | null = null;
+
     if (recurring && recurring.frequency) {
-      const { data: sub, error: subError } = await adminSupabase
+      let squarePlanId: string | null = null;
+      let squarePlanVariationId: string | null = null;
+      let squareSubscriptionId: string | null = null;
+
+      if (profile.square_customer_id && isSquareConfigured()) {
+        try {
+          const plan = await createSquareSubscriptionPlan({
+            label:
+              recurring.label ??
+              `${profile.company_name ?? "Wholesale"} ${recurring.frequency}`,
+            frequency: recurring.frequency,
+            totalAmountCents: subtotalCents,
+            idempotencyKey: `portal-sub-plan-${order.id}`,
+          });
+          squarePlanId = plan.square_plan_id;
+          squarePlanVariationId = plan.square_plan_variation_id;
+
+          const sub = await createSquareSubscription({
+            squareCustomerId: profile.square_customer_id,
+            planVariationId: plan.square_plan_variation_id,
+            idempotencyKey: `portal-sub-${order.id}`,
+            startDate: nextRunDate(recurring.frequency),
+          });
+          squareSubscriptionId = sub.square_subscription_id;
+        } catch (subErr) {
+          console.error(
+            "Square subscription creation failed:",
+            subErr instanceof Error ? subErr.message : String(subErr)
+          );
+          subscriptionError =
+            "Could not schedule automatic repeats in Square — the first order was placed but the recurring schedule was not saved. Please contact Valley.";
+        }
+      }
+
+      // Save our local mirror row regardless of Square success so the
+      // portal UI always has a record. Square IDs are null if Square
+      // was unreachable or the customer isn't linked.
+      const { data: subRow, error: mirrorError } = await adminSupabase
         .from("order_subscriptions")
         .insert({
           profile_id: user.id,
           label: recurring.label ?? null,
           items: validatedItems,
           frequency: recurring.frequency,
-          status: "active",
+          status: squareSubscriptionId ? "active" : "paused",
           next_run_date: nextRunDate(recurring.frequency),
+          square_plan_id: squarePlanId,
+          square_plan_variation_id: squarePlanVariationId,
+          square_subscription_id: squareSubscriptionId,
+          last_synced_at: squareSubscriptionId ? new Date().toISOString() : null,
         })
         .select()
         .single();
-      if (subError) {
-        console.error("order_subscriptions insert failed:", subError);
-        subscriptionError = "Could not save recurring schedule";
-      } else if (sub) {
-        subscriptionId = sub.id;
+
+      if (mirrorError) {
+        console.error("order_subscriptions insert failed:", mirrorError);
+        if (!subscriptionError) {
+          subscriptionError = "Could not save recurring schedule";
+        }
+      } else if (subRow) {
+        subscriptionId = subRow.id;
       }
     }
 

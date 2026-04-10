@@ -23,6 +23,7 @@ interface Subscription {
   status: "active" | "paused" | "cancelled";
   next_run_date: string | null;
   created_at: string;
+  square_subscription_id: string | null;
 }
 
 function formatFrequency(f: string): string {
@@ -69,9 +70,41 @@ export default async function SubscriptionsPage() {
     } = await supa.auth.getUser();
     if (!actor) return;
 
+    // Load current subscription row (scoped to the caller via RLS).
+    const { data: current } = await supa
+      .from("order_subscriptions")
+      .select("square_subscription_id")
+      .eq("id", id)
+      .eq("profile_id", actor.id)
+      .maybeSingle();
+
+    // If Square has a subscription for this row, drive Square first.
+    // Our Supabase row then gets the new status + a last_synced_at.
+    if (current?.square_subscription_id) {
+      const { isSquareConfigured, pauseSquareSubscription, resumeSquareSubscription, cancelSquareSubscription } = await import("@/lib/square/client");
+      if (isSquareConfigured()) {
+        try {
+          if (status === "paused") {
+            await pauseSquareSubscription(current.square_subscription_id);
+          } else if (status === "active") {
+            await resumeSquareSubscription(current.square_subscription_id);
+          } else if (status === "cancelled") {
+            await cancelSquareSubscription(current.square_subscription_id);
+          }
+        } catch (err) {
+          console.error("portal setStatus — Square call failed:", err);
+          // Still fall through and update our mirror so the UI isn't stuck.
+        }
+      }
+    }
+
     await supa
       .from("order_subscriptions")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      })
       .eq("id", id)
       .eq("profile_id", actor.id);
 

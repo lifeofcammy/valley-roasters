@@ -5,10 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 /**
  * Square webhook receiver.
  *
- * Square POSTs here whenever an invoice we care about changes state.
- * We listen for:
+ * Square POSTs here whenever an invoice or subscription we care about
+ * changes state. We listen for:
  *   - invoice.payment_made      → mark Supabase order as paid
  *   - invoice.canceled          → mark Supabase order as cancelled
+ *   - subscription.updated      → mirror Square's active/paused/canceled
+ *   - subscription.canceled     → mark Supabase sub row as cancelled
  *
  * Auth: HMAC-SHA256 signature verification. Square signs the message
  * with `SQUARE_WEBHOOK_SIGNATURE_KEY` over (notification_url + raw body)
@@ -20,16 +22,23 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * attackers from spoofing payment events. Do NOT bypass it.
  */
 
-type SquareInvoiceWebhookPayload = {
+type SquareWebhookPayload = {
   type?: string;
   event_id?: string;
   data?: {
-    id?: string; // invoice id
+    id?: string; // invoice id OR subscription id depending on event type
     object?: {
       invoice?: {
         id?: string;
         status?: string;
         order_id?: string;
+      };
+      subscription?: {
+        id?: string;
+        status?: string;
+        paused_date?: string;
+        canceled_date?: string;
+        charged_through_date?: string;
       };
     };
   };
@@ -92,12 +101,70 @@ export async function POST(request: Request) {
 
   let payload: SquareInvoiceWebhookPayload;
   try {
-    payload = JSON.parse(rawBody) as SquareInvoiceWebhookPayload;
+    payload = JSON.parse(rawBody) as SquareWebhookPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const eventType = payload.type ?? "";
+
+  // ---- SUBSCRIPTION events ----
+  if (eventType.startsWith("subscription.")) {
+    const sub = payload.data?.object?.subscription;
+    const squareSubId = sub?.id ?? payload.data?.id;
+    if (!squareSubId) {
+      return NextResponse.json({ ok: true, ignored: "no subscription id" });
+    }
+
+    const admin = createAdminClient();
+    const { data: subRow } = await admin
+      .from("order_subscriptions")
+      .select("id, status")
+      .eq("square_subscription_id", squareSubId)
+      .maybeSingle();
+
+    if (!subRow) {
+      console.log(
+        `[square webhook] ${eventType} for untracked subscription ${squareSubId}`
+      );
+      return NextResponse.json({ ok: true, ignored: "untracked subscription" });
+    }
+
+    // Map Square status → our local enum
+    const raw = (sub?.status ?? "").toUpperCase();
+    let localStatus: "active" | "paused" | "cancelled" | null = null;
+    if (raw === "ACTIVE") localStatus = "active";
+    else if (raw === "PAUSED") localStatus = "paused";
+    else if (raw === "CANCELED" || raw === "DEACTIVATED")
+      localStatus = "cancelled";
+
+    if (eventType === "subscription.canceled") localStatus = "cancelled";
+
+    if (!localStatus) {
+      return NextResponse.json({ ok: true, ignored: "unknown sub status" });
+    }
+
+    const { error: subUpdateError } = await admin
+      .from("order_subscriptions")
+      .update({
+        status: localStatus,
+        updated_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq("id", subRow.id);
+
+    if (subUpdateError) {
+      console.error("[square webhook] sub update failed:", subUpdateError);
+      return NextResponse.json({ error: "Update failed" }, { status: 500 });
+    }
+
+    console.log(
+      `[square webhook] ${eventType} → sub ${subRow.id} = ${localStatus}`
+    );
+    return NextResponse.json({ ok: true, subscriptionId: subRow.id, status: localStatus });
+  }
+
+  // ---- INVOICE events ----
   const invoice = payload.data?.object?.invoice;
   const invoiceId = invoice?.id ?? payload.data?.id;
 
