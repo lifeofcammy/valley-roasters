@@ -147,68 +147,84 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Coffee Selection */}
+      {/* Specialty Grade + Custom Blends */}
       <section className="py-20 sm:py-24 bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12 sm:mb-16 fade-up-on-scroll">
-            <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
-              From Our Roastery
-            </span>
-            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
-              Best Sellers
-            </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div className="fade-up-on-scroll">
+              <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
+                Specialty Grade
+              </span>
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3 leading-tight">
+                Coffee That Speaks
+                <br />
+                for Itself
+              </h2>
+              <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                Every bean we source is specialty grade &mdash; scoring 80+ on the SCA
+                scale. We work directly with sustainable farms in Brazil,
+                Guatemala, and Honduras, selecting lots for their distinct
+                flavor profiles and consistency season over season.
+              </p>
+              <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                All of our coffee is organic, roasted in small batches at our
+                facility in Gilbert, Arizona, and shipped within days of
+                roasting.
+              </p>
+            </div>
+            <div className="relative fade-up-delay-1">
+              <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden shadow-xl">
+                <Image
+                  src="https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&q=85"
+                  alt="Specialty grade coffee beans"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {topSellers.map((item, index) => {
-              const coffeeImages = [
-                "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&q=80",
-                "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=400&q=80",
-                "https://images.unsplash.com/photo-1498804103079-a6351b050096?w=400&q=80",
-                "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&q=80",
-                "https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=400&q=80",
-                "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80",
-                "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80",
-                "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=400&q=80",
-              ];
-              const delayClasses = [
-                "fade-up-on-scroll",
-                "fade-up-delay-1",
-                "fade-up-delay-2",
-                "fade-up-delay-3",
-              ];
-              return (
-                <div
-                  key={item.name}
-                  className={`group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${delayClasses[index % 4]}`}
-                >
-                  <div className="relative h-64 overflow-hidden">
-                    <Image
-                      src={coffeeImages[index % coffeeImages.length]}
-                      alt={item.name}
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-700"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <h3 className="font-display text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-                      {item.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                      {item.qty_lbs.toLocaleString()} lbs sold to wholesale
-                      partners
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Custom Blends */}
+          <div className="mt-20 sm:mt-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div className="relative order-2 lg:order-1 fade-up-delay-1">
+              <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden shadow-xl">
+                <Image
+                  src="https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=800&q=85"
+                  alt="Custom coffee blend development"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            </div>
+            <div className="order-1 lg:order-2 fade-up-on-scroll">
+              <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
+                Made for You
+              </span>
+              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3 leading-tight">
+                Custom Blends for
+                <br />
+                Your Menu
+              </h2>
+              <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                Several of our partners serve coffee blended exclusively for
+                their business &mdash; a house espresso, a signature drip, a blend
+                that&apos;s theirs alone. We develop the roast profile with you
+                and produce it on your schedule.
+              </p>
+              <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                Whether you need a single origin or a custom blend, we&apos;ll
+                work with you to get it right.
+              </p>
+              <div className="mt-8">
+                <Link href="/contact">
+                  <Button className="btn-lift bg-primary hover:bg-primary/90 text-white font-semibold px-8">
+                    Let&apos;s Talk
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </div>
-
-          {topSellers.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">
-              Our current selection is being updated. Check back soon.
-            </p>
-          )}
         </div>
       </section>
 

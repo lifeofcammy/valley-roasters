@@ -38,7 +38,7 @@ const faqItems = [
   {
     question: "How fresh is the coffee?",
     answer:
-      "Every order is roasted within 24–48 hours of placement. We don't hold inventory — your coffee is roasted to order and shipped immediately. Most partners receive it within 3–5 business days.",
+      "Every order is roasted within 24–48 hours of placement. We don't hold inventory — your coffee is roasted to order and shipped immediately.",
   },
   {
     question: "What is the minimum order?",
