@@ -106,11 +106,13 @@ export default async function HomePage() {
           </div>
           <div className="relative order-1 lg:order-2 min-h-[280px] lg:min-h-0 bg-[#0c0705]">
             <video
+              data-autoplay
               autoPlay
               loop
               muted
               playsInline
               preload="auto"
+              poster="/images/coffee-brewing-poster.jpg"
               className="absolute inset-0 w-full h-full object-cover"
             >
               <source src="/videos/coffee-brewing.mp4" type="video/mp4" />
