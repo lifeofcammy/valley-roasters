@@ -13,7 +13,9 @@ export default async function HomePage() {
   let topSellers: SquareTopItem[] = [];
   if (isSquareConfigured()) {
     try {
-      topSellers = await fetchTopSellingItems(4);
+      topSellers = (await fetchTopSellingItems(12)).filter(
+        (item) => !item.name.startsWith("TC ")
+      ).slice(0, 8);
     } catch {
       topSellers = [];
     }
@@ -148,21 +150,13 @@ export default async function HomePage() {
       {/* Coffee Selection */}
       <section className="py-20 sm:py-24 bg-muted">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-12 sm:mb-16 gap-4 fade-up-on-scroll">
-            <div>
-              <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
-                From Our Roastery
-              </span>
-              <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
-                Best Sellers
-              </h2>
-            </div>
-            <Link href="/wholesale">
-              <Button variant="outline" className="btn-lift font-semibold">
-                View All
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+          <div className="mb-12 sm:mb-16 fade-up-on-scroll">
+            <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
+              From Our Roastery
+            </span>
+            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
+              Best Sellers
+            </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
@@ -172,6 +166,10 @@ export default async function HomePage() {
                 "https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=400&q=80",
                 "https://images.unsplash.com/photo-1498804103079-a6351b050096?w=400&q=80",
                 "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&q=80",
+                "https://images.unsplash.com/photo-1514432324607-a09d9b4aefda?w=400&q=80",
+                "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&q=80",
+                "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80",
+                "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=400&q=80",
               ];
               const delayClasses = [
                 "fade-up-on-scroll",
