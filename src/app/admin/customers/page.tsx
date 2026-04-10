@@ -68,22 +68,6 @@ export default async function AdminCustomersPage() {
                     {format(new Date(customer.created_at), "MMM d, yyyy")}
                   </p>
                   <div className="flex items-center gap-2">
-                    <form action="/api/admin/impersonate" method="POST">
-                      <input
-                        type="hidden"
-                        name="targetCustomerId"
-                        value={customer.id}
-                      />
-                      <Button
-                        type="submit"
-                        variant="secondary"
-                        size="sm"
-                        title="View the portal as this customer"
-                      >
-                        <Eye className="mr-1 h-3 w-3" />
-                        View as
-                      </Button>
-                    </form>
                     <Link href={`/admin/customers/${customer.id}`}>
                       <Button variant="outline" size="sm">
                         Edit
