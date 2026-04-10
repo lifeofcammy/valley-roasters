@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,14 +12,6 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 
-async function assertAdmin() {
-  const s = await createClient();
-  const { data: { user } } = await s.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  const { data: p } = await s.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (p?.role !== "admin") throw new Error("Forbidden");
-}
-
 export default async function AdminCustomersPage() {
   const supabase = await createClient();
   const { data: customers } = await supabase
@@ -28,20 +19,6 @@ export default async function AdminCustomersPage() {
     .select("*")
     .eq("role", "customer")
     .order("created_at", { ascending: false });
-
-  async function toggleApproval(formData: FormData) {
-    "use server";
-    const customerId = formData.get("customer_id") as string;
-    const currentApproved = formData.get("current_approved") === "true";
-    const supabase = await createClient();
-
-    await supabase
-      .from("profiles")
-      .update({ is_approved: !currentApproved })
-      .eq("id", customerId);
-
-    revalidatePath("/admin/customers");
-  }
 
   return (
     <div>
@@ -89,25 +66,11 @@ export default async function AdminCustomersPage() {
                     Joined{" "}
                     {format(new Date(customer.created_at), "MMM d, yyyy")}
                   </p>
-                  <form action={toggleApproval}>
-                    <input
-                      type="hidden"
-                      name="customer_id"
-                      value={customer.id}
-                    />
-                    <input
-                      type="hidden"
-                      name="current_approved"
-                      value={String(customer.is_approved)}
-                    />
-                    <Button
-                      type="submit"
-                      variant={customer.is_approved ? "outline" : "default"}
-                      size="sm"
-                    >
-                      {customer.is_approved ? "Revoke" : "Approve"}
+                  <Link href={`/admin/customers/${customer.id}`}>
+                    <Button variant="outline" size="sm">
+                      Edit
                     </Button>
-                  </form>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -154,25 +117,11 @@ export default async function AdminCustomersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <form action={toggleApproval}>
-                        <input
-                          type="hidden"
-                          name="customer_id"
-                          value={customer.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="current_approved"
-                          value={String(customer.is_approved)}
-                        />
-                        <Button
-                          type="submit"
-                          variant={customer.is_approved ? "outline" : "default"}
-                          size="sm"
-                        >
-                          {customer.is_approved ? "Revoke" : "Approve"}
+                      <Link href={`/admin/customers/${customer.id}`}>
+                        <Button variant="outline" size="sm">
+                          Edit
                         </Button>
-                      </form>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

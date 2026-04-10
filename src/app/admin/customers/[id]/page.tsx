@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
@@ -77,6 +78,20 @@ export default async function AdminCustomerDetailPage({
     revalidatePath(`/admin/customers/${id}`);
   }
 
+  async function updateAdminFields(formData: FormData) {
+    "use server";
+    await assertAdmin();
+    const supabase = await createClient();
+    const isApproved = formData.get("is_approved") === "on";
+    const internalNotes = (formData.get("internal_notes") as string) || null;
+    await supabase
+      .from("profiles")
+      .update({ is_approved: isApproved, internal_notes: internalNotes })
+      .eq("id", id);
+    revalidatePath(`/admin/customers/${id}`);
+    revalidatePath("/admin/customers");
+  }
+
   return (
     <div>
       <div className="flex items-start gap-3 mb-6 sm:mb-8 flex-wrap">
@@ -104,6 +119,54 @@ export default async function AdminCustomerDetailPage({
           {customer.is_approved ? "Approved" : "Pending"}
         </Badge>
       </div>
+
+      {/* Status & Internal Notes — admin-only edit form */}
+      <form action={updateAdminFields} className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Account & Notes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="is_approved"
+                defaultChecked={customer.is_approved}
+                className="mt-1 h-4 w-4 rounded border-input accent-primary"
+              />
+              <div>
+                <p className="font-semibold text-sm">
+                  Approved (active wholesale account)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Uncheck to suspend this customer&apos;s portal access. They
+                  can still log in but can&apos;t place orders or see prices.
+                </p>
+              </div>
+            </label>
+
+            <div className="space-y-2">
+              <Label htmlFor="internal_notes">
+                Internal notes (admin only)
+              </Label>
+              <Textarea
+                id="internal_notes"
+                name="internal_notes"
+                rows={4}
+                placeholder="Anything Top Cup staff needs to remember about this customer — payment terms, contact preferences, special instructions..."
+                defaultValue={customer.internal_notes ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Visible only to admins. Customers never see this.
+              </p>
+            </div>
+
+            <Button type="submit" className="w-full sm:w-auto">
+              Save Account Changes
+            </Button>
+          </CardContent>
+        </Card>
+      </form>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Custom Pricing */}

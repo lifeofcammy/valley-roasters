@@ -14,18 +14,50 @@ import { displayStatusName } from "@/lib/order-status";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 
-export default async function AdminOrdersPage() {
+const PAGE_SIZE = 50;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string }>;
+}
+
+export default async function AdminOrdersPage({ searchParams }: PageProps) {
   const supabase = await createClient();
-  const { data: orders } = await supabase
+
+  // Resolve current page from ?page=N (1-indexed). Clamp to >= 1.
+  const sp = await searchParams;
+  const requestedPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+
+  // Range is 0-indexed and inclusive. Page 1 -> rows 0..49.
+  const fromIdx = (requestedPage - 1) * PAGE_SIZE;
+  const toIdx = fromIdx + PAGE_SIZE - 1;
+
+  const { data: orders, count } = await supabase
     .from("orders")
-    .select("*, profiles(company_name, full_name), order_items(count)")
-    .order("created_at", { ascending: false });
+    .select("*, profiles(company_name, full_name), order_items(count)", {
+      count: "exact",
+    })
+    .order("created_at", { ascending: false })
+    .range(fromIdx, toIdx);
+
+  const totalRows = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const startRow = totalRows === 0 ? 0 : fromIdx + 1;
+  const endRow = Math.min(fromIdx + PAGE_SIZE, totalRows);
 
   return (
     <div>
-      <h1 className="font-display text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">
-        All Orders
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-6 sm:mb-8">
+        <h1 className="font-display text-2xl sm:text-3xl font-bold">
+          All Orders
+        </h1>
+        {totalRows > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Showing <strong>{startRow}–{endRow}</strong> of{" "}
+            <strong>{totalRows.toLocaleString()}</strong>
+          </p>
+        )}
+      </div>
 
       {!orders || orders.length === 0 ? (
         <p className="text-muted-foreground text-center py-16">No orders yet.</p>
@@ -156,6 +188,44 @@ export default async function AdminOrdersPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination — Prev / page numbers / Next */}
+          {totalPages > 1 && (
+            <nav
+              aria-label="Orders pagination"
+              className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            >
+              <p className="text-sm text-muted-foreground text-center sm:text-left">
+                Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                {currentPage > 1 ? (
+                  <Link
+                    href={`/admin/orders?page=${currentPage - 1}`}
+                    className="px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+                  >
+                    ← Previous
+                  </Link>
+                ) : (
+                  <span className="px-3 py-2 rounded-md border text-sm text-muted-foreground/50 cursor-not-allowed">
+                    ← Previous
+                  </span>
+                )}
+                {currentPage < totalPages ? (
+                  <Link
+                    href={`/admin/orders?page=${currentPage + 1}`}
+                    className="px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+                  >
+                    Next →
+                  </Link>
+                ) : (
+                  <span className="px-3 py-2 rounded-md border text-sm text-muted-foreground/50 cursor-not-allowed">
+                    Next →
+                  </span>
+                )}
+              </div>
+            </nav>
+          )}
         </>
       )}
     </div>
