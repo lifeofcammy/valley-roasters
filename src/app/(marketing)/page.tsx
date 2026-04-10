@@ -177,12 +177,6 @@ export default async function HomePage() {
                 "fade-up-delay-2",
                 "fade-up-delay-3",
               ];
-              const tagline =
-                index === 0
-                  ? "#1 Best Seller"
-                  : index === 1
-                    ? "#2 Best Seller"
-                    : "Wholesale Favorite";
               return (
                 <div
                   key={item.name}
@@ -195,12 +189,6 @@ export default async function HomePage() {
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <span className="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                        {tagline}
-                      </span>
-                    </div>
                   </div>
                   <div className="p-6">
                     <h3 className="font-display text-xl font-bold text-foreground group-hover:text-primary transition-colors">

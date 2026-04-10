@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { fetchCoffeeCatalog, type SquareCoffeeItem } from "@/lib/square/client";
-import { ArrowRight, ClipboardList, DollarSign, RotateCcw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 type HighlightRow = {
   square_catalog_object_id: string;
@@ -176,56 +176,7 @@ export default async function WholesalePage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 sm:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16 fade-up-on-scroll">
-            <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
-              Simple Process
-            </span>
-            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
-              How It Works
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10">
-            {[
-              {
-                icon: ClipboardList,
-                title: "Apply & Get Approved",
-                description:
-                  "Submit a quick application. We'll review it and set up your account with custom wholesale pricing tailored to your business.",
-                delay: "fade-up-on-scroll",
-              },
-              {
-                icon: DollarSign,
-                title: "Browse & Order",
-                description:
-                  "Log into your wholesale portal to see your personalized pricing. Browse our selection and place your order in minutes.",
-                delay: "fade-up-delay-1",
-              },
-              {
-                icon: RotateCcw,
-                title: "Reorder with One Click",
-                description:
-                  "Need the same order again? Just hit the reorder button on any past order. It's that simple.",
-                delay: "fade-up-delay-2",
-              },
-            ].map((item) => (
-              <div key={item.title} className={`text-center ${item.delay}`}>
-                <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/10 mb-5 sm:mb-6 ring-4 ring-primary/5">
-                  <item.icon className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                </div>
-                <h3 className="font-display text-xl sm:text-2xl font-semibold mb-3">
-                  {item.title}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Product Catalog */}
       <section className="py-20 sm:py-24 bg-muted">
