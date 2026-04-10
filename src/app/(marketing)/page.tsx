@@ -73,7 +73,7 @@ export default async function HomePage() {
                 size="lg"
                 className="btn-lift w-full sm:w-auto bg-primary hover:bg-primary/90 text-white text-base sm:text-lg px-8 sm:px-10 py-6 sm:py-7 font-semibold shadow-lg shadow-primary/25"
               >
-                Become a Wholesale Partner
+                Become a Wholesale Customer
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
