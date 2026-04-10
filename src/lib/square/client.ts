@@ -64,6 +64,7 @@ const HIDDEN_ORDER_IDS = new Set([
   "sNFzrRJP5NOn8fZsj4hnAOgDGtOZY",
   "Get8AQKrweM6Pvhru16lByffsN7YY",
   "IZuK4nICywWwjIooonMi0RJeA9dZY",
+  "Mdj6pK40GuvCDzbS8YgOQrpMT7GZY",
 ]);
 
 export type SquareMoney = {
