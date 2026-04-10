@@ -149,10 +149,10 @@ export default async function HomePage() {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-12 sm:mb-16 gap-4 fade-up-on-scroll">
             <div>
               <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
-                Our Selection
+                From Our Roastery
               </span>
               <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
-                Current Offerings
+                Best Sellers
               </h2>
             </div>
             <Link href="/wholesale">
