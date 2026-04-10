@@ -206,10 +206,10 @@ export default async function HomePage() {
                 Your Menu
               </h2>
               <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed">
-                Several of our partners serve coffee blended exclusively for
-                their business &mdash; a house espresso, a signature drip, a blend
-                that&apos;s theirs alone. We develop the roast profile with you
-                and produce it on your schedule.
+                Request a custom coffee blend tailored to your menu &mdash; a
+                house espresso, a signature drip, a blend that&apos;s yours
+                alone. We develop the roast profile with you and produce
+                it on your schedule.
               </p>
               <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
                 Whether you need a single origin or a custom blend, we&apos;ll
