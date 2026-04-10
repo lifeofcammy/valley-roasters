@@ -31,29 +31,29 @@ export const metadata: Metadata = {
 
 const faqItems = [
   {
-    question: "What is the minimum order quantity?",
+    question: "Are your beans organic?",
     answer:
-      "Our minimum order is 5 lbs per product. Most of our partners order 25-50 lb bags for optimal freshness and value.",
+      "Yes. We source certified organic beans from sustainable farms in Brazil, Guatemala, and Honduras. Our roasting facility maintains organic handling practices throughout the process.",
   },
   {
-    question: "How does wholesale pricing work?",
+    question: "How fresh is the coffee?",
     answer:
-      "Every partner receives custom pricing based on volume and product selection. Your dedicated pricing is visible in your wholesale portal after approval.",
+      "Every order is roasted within 24–48 hours of placement. We don't hold inventory — your coffee is roasted to order and shipped immediately. Most partners receive it within 3–5 business days.",
   },
   {
-    question: "How quickly do you roast and ship?",
+    question: "What is the minimum order?",
     answer:
-      "All orders are roasted within 24-48 hours of placement and shipped immediately. Most partners receive their coffee within 3-5 business days.",
-  },
-  {
-    question: "Can I reorder my previous orders easily?",
-    answer:
-      "Yes! Our wholesale portal features a one-click reorder button. Just click reorder on any past order and it will pre-fill your cart with the same items.",
+      "5 lbs per product. Most of our partners order 25–50 lb bags.",
   },
   {
     question: "Do you offer custom blends or private labeling?",
     answer:
-      "Absolutely. We work with partners to develop custom blends tailored to their needs. Contact us to discuss private label options.",
+      "Yes. We work with partners to develop blends tailored to their menu. Contact us to discuss private label options.",
+  },
+  {
+    question: "How does pricing work?",
+    answer:
+      "Every partner receives custom pricing based on volume and product mix. Reach out and we'll put together a quote for your business.",
   },
 ];
 
@@ -155,14 +155,14 @@ export default async function WholesalePage() {
               Wholesale Program
             </span>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-white mt-3 leading-tight">
-              Premium Wholesale Coffee
+              Wholesale Coffee
               <br />
-              <span className="text-primary">for Your Business</span>
+              <span className="text-primary">Roasted with Care</span>
             </h1>
             <p className="mt-5 sm:mt-6 text-lg sm:text-xl text-white/80 leading-relaxed max-w-2xl">
-              Specialty-grade roasted coffee sourced directly from the world&apos;s
-              finest growing regions. Custom wholesale pricing, a streamlined
-              ordering portal, and coffee roasted fresh when you order it.
+              Organic, small-batch roasted beans sourced from sustainable farms.
+              Every order is roasted fresh and shipped within days — never
+              sitting on a shelf.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               <Link href="/contact" className="w-full sm:w-auto">
@@ -183,13 +183,13 @@ export default async function WholesalePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16 fade-up-on-scroll">
             <span className="text-primary font-semibold text-xs sm:text-sm uppercase tracking-widest">
-              The Selection
+              What We Roast
             </span>
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold mt-3">
-              Our Wholesale Coffee
+              Our Coffees
             </h2>
             <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Premium single origins and signature blends available in 5lb, 25lb, and 50lb bags.
+              Single origins and blends, all organic, roasted in small batches in Gilbert, Arizona.
             </p>
           </div>
 
