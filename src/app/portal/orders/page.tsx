@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveProfile } from "@/lib/impersonate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,25 +46,18 @@ function formatMoney(cents: number | null | undefined): string {
 }
 
 export default async function OrdersPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Resolve effective profile (real user OR impersonated customer
+  // when an admin clicked "View as ..." in admin/customers).
+  const effective = await getEffectiveProfile();
+  const profile = effective.profile;
+  const effectiveUserId = effective.userId;
 
   let orders: NormalizedOrder[] = [];
   let loadError: string | null = null;
   let dataSource: "square" | "supabase" = "supabase";
 
-  if (user) {
-    // Check if this customer has a linked Square account
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("square_customer_id")
-      .eq("id", user.id)
-      .single();
-
-    const squareId = profile?.square_customer_id;
+  if (profile && effectiveUserId) {
+    const squareId = profile.square_customer_id;
 
     if (squareId && isSquareConfigured()) {
       // Read order history from Square (source of truth for wholesale)
@@ -94,13 +88,18 @@ export default async function OrdersPage() {
           "We couldn't load your recent orders. Please refresh in a moment.";
       }
     } else {
-      // Fallback: read from Supabase orders table
-      const { data, error } = await supabase
+      // Fallback: read from Supabase orders table.
+      // Use the admin client because under impersonation the admin's
+      // auth.uid() is NOT the customer's id, so RLS would block this.
+      // Self-view falls through here too — the admin client is safe
+      // because we scope the query to the effective user id.
+      const adminSupabase = createAdminClient();
+      const { data, error } = await adminSupabase
         .from("orders")
         .select(
           "id, order_number, status, payment_status, total_cents, created_at, square_invoice_status, order_items(count)"
         )
-        .eq("profile_id", user.id)
+        .eq("profile_id", effectiveUserId)
         .order("created_at", { ascending: false });
 
       if (error) {

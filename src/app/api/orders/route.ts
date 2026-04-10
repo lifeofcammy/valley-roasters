@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isImpersonatingFromCookie } from "@/lib/impersonate";
 import {
   createSquareInvoice,
   createSquareOrder,
@@ -105,6 +106,17 @@ async function getAutoPublishInvoices(): Promise<boolean> {
 
 export async function POST(request: Request) {
   try {
+    // Refuse all order placement while an admin is in "view as customer"
+    // mode. The portal UI also disables the Place Order button, but
+    // belt-and-braces — never let an admin accidentally place a real
+    // order against another company's account.
+    if (await isImpersonatingFromCookie()) {
+      return NextResponse.json(
+        { error: "Disabled while impersonating" },
+        { status: 403 }
+      );
+    }
+
     const supabase = await createClient();
     const {
       data: { user },

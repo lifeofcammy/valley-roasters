@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveProfile } from "@/lib/impersonate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,19 +63,14 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Use the effective profile so admin "view as customer" sees the
+  // target customer's order, not the admin's own orders.
+  const effective = await getEffectiveProfile();
+  const profile = effective.profile;
+  const effectiveUserId = effective.userId;
 
-  if (!user) notFound();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("square_customer_id")
-    .eq("id", user.id)
-    .single();
+  if (!profile || !effectiveUserId) notFound();
 
   let order: NormalizedOrder | null = null;
 
@@ -133,12 +129,15 @@ export default async function OrderDetailPage({
   // Supabase fallback — runs when:
   //   - customer is not Square-linked, OR
   //   - the requested id is a Supabase UUID (e.g. a portal-placed order)
+  // Uses the admin client so impersonation works (the admin's auth.uid
+  // is not the customer's id, so RLS would otherwise refuse the row).
   if (!order) {
-    const { data } = await supabase
+    const adminSupabase = createAdminClient();
+    const { data } = await adminSupabase
       .from("orders")
       .select("*, order_items(*)")
       .eq("id", id)
-      .eq("profile_id", user.id)
+      .eq("profile_id", effectiveUserId)
       .single();
 
     if (!data) notFound();

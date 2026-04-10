@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -112,6 +112,18 @@ export default async function AdminCustomerDetailPage({
             </a>
           </p>
         </div>
+        <form action="/api/admin/impersonate" method="POST" className="flex-shrink-0">
+          <input type="hidden" name="targetCustomerId" value={customer.id} />
+          <Button
+            type="submit"
+            variant="secondary"
+            size="sm"
+            title="View the portal as this customer"
+          >
+            <Eye className="mr-1 h-4 w-4" />
+            View as Customer
+          </Button>
+        </form>
         <Badge
           variant={customer.is_approved ? "default" : "secondary"}
           className="flex-shrink-0"

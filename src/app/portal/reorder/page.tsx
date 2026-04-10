@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useImpersonation } from "@/components/shared/ImpersonationProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ export default function ReorderPage() {
   const router = useRouter();
   const fromOrderId = searchParams.get("from");
   const supabase = createClient();
+  const { isImpersonating } = useImpersonation();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -135,6 +137,10 @@ export default function ReorderPage() {
   );
 
   async function handlePlaceOrder() {
+    if (isImpersonating) {
+      toast.error("Disabled in admin preview mode.");
+      return;
+    }
     if (cart.length === 0) {
       toast.error("Add items to your cart first.");
       return;
@@ -372,7 +378,7 @@ export default function ReorderPage() {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={cart.length === 0 || placing}
+                disabled={cart.length === 0 || placing || isImpersonating}
                 onClick={handlePlaceOrder}
               >
                 {placing ? (
@@ -386,6 +392,11 @@ export default function ReorderPage() {
                   "Place Order"
                 )}
               </Button>
+              {isImpersonating && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Disabled in admin preview mode
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

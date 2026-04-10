@@ -2,6 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getEffectiveProfile,
+  isImpersonatingFromCookie,
+} from "@/lib/impersonate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,16 +46,19 @@ function formatDate(iso: string | null): string {
 }
 
 export default async function SubscriptionsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const effective = await getEffectiveProfile();
+  if (!effective.profile || !effective.userId) redirect("/login");
 
-  const { data: subs } = await supabase
+  const isImpersonating = effective.isImpersonating;
+  const effectiveUserId = effective.userId;
+
+  // Use admin client when impersonating (RLS would otherwise block
+  // the admin from reading another customer's subscriptions).
+  const reader = createAdminClient();
+  const { data: subs } = await reader
     .from("order_subscriptions")
     .select("*")
-    .eq("profile_id", user.id)
+    .eq("profile_id", effectiveUserId)
     .order("created_at", { ascending: false });
 
   const list = (subs ?? []) as Subscription[];
@@ -59,6 +67,10 @@ export default async function SubscriptionsPage() {
 
   async function setStatus(formData: FormData) {
     "use server";
+    // Defense in depth: refuse all writes while impersonating, even
+    // though the UI buttons are also disabled.
+    if (await isImpersonatingFromCookie()) return;
+
     const id = formData.get("id");
     const status = formData.get("status");
     if (typeof id !== "string" || typeof status !== "string") return;
@@ -190,6 +202,7 @@ export default async function SubscriptionsPage() {
                   variant="outline"
                   size="sm"
                   className="w-full"
+                  disabled={isImpersonating}
                 >
                   <Pause className="mr-2 h-4 w-4" />
                   Pause
@@ -200,7 +213,12 @@ export default async function SubscriptionsPage() {
               <form action={setStatus} className="flex-1">
                 <input type="hidden" name="id" value={sub.id} />
                 <input type="hidden" name="status" value="active" />
-                <Button type="submit" size="sm" className="w-full">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="w-full"
+                  disabled={isImpersonating}
+                >
                   <Play className="mr-2 h-4 w-4" />
                   Resume
                 </Button>
@@ -215,6 +233,7 @@ export default async function SubscriptionsPage() {
                   variant="outline"
                   size="sm"
                   className="w-full"
+                  disabled={isImpersonating}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Cancel
@@ -222,6 +241,11 @@ export default async function SubscriptionsPage() {
               </form>
             )}
           </div>
+          {isImpersonating && !isCancelled && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Disabled in admin preview mode
+            </p>
+          )}
         </CardContent>
       </Card>
     );

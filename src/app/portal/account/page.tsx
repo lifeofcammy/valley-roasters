@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useImpersonation } from "@/components/shared/ImpersonationProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ interface Profile {
 
 export default function AccountPage() {
   const supabase = createClient();
+  const { isImpersonating } = useImpersonation();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,20 +34,31 @@ export default function AccountPage() {
 
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("profiles")
-        .select(
-          "full_name, company_name, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, email"
-        )
-        .eq("id", user.id)
-        .single();
-
-      if (data) setProfile(data);
+      // Fetch via /api/portal/me so this honors admin impersonation
+      // (which the client supabase auth.uid() can't see).
+      try {
+        const res = await fetch("/api/portal/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const p = data?.profile;
+          if (p) {
+            // Coerce nullable strings to "" so the inputs stay controlled.
+            setProfile({
+              full_name: p.full_name ?? "",
+              company_name: p.company_name ?? "",
+              company_phone: p.company_phone ?? "",
+              company_address_line1: p.company_address_line1 ?? "",
+              company_address_line2: p.company_address_line2 ?? "",
+              company_city: p.company_city ?? "",
+              company_state: p.company_state ?? "",
+              company_zip: p.company_zip ?? "",
+              email: p.email ?? "",
+            });
+          }
+        }
+      } catch {
+        // ignore — UI will show loading state cleared below
+      }
       setLoading(false);
     }
     load();
@@ -54,6 +67,10 @@ export default function AccountPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
+    if (isImpersonating) {
+      toast.error("Disabled in admin preview mode.");
+      return;
+    }
     setSaving(true);
 
     const {
@@ -88,6 +105,10 @@ export default function AccountPage() {
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
+    if (isImpersonating) {
+      toast.error("Disabled in admin preview mode.");
+      return;
+    }
     if (newPassword.length < 8) {
       toast.error("Password must be at least 8 characters.");
       return;
@@ -243,9 +264,20 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={saving} className="w-full sm:w-auto">
-          {saving ? "Saving..." : "Save Changes"}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            type="submit"
+            disabled={saving || isImpersonating}
+            className="w-full sm:w-auto"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+          {isImpersonating && (
+            <p className="text-xs text-muted-foreground">
+              Disabled in admin preview mode
+            </p>
+          )}
+        </div>
       </form>
 
       {/* Password change — separate form so the profile Save button doesn't trigger it */}
@@ -282,12 +314,19 @@ export default function AccountPage() {
             </div>
             <Button
               type="submit"
-              disabled={pwSaving || !newPassword || !confirmPassword}
+              disabled={
+                pwSaving || !newPassword || !confirmPassword || isImpersonating
+              }
               variant="outline"
               className="w-full sm:w-auto"
             >
               {pwSaving ? "Updating..." : "Update Password"}
             </Button>
+            {isImpersonating && (
+              <p className="text-xs text-muted-foreground">
+                Disabled in admin preview mode
+              </p>
+            )}
           </CardContent>
         </Card>
       </form>

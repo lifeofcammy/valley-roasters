@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Eye } from "lucide-react";
 import { format } from "date-fns";
 
 export default async function AdminCustomersPage() {
@@ -66,11 +67,29 @@ export default async function AdminCustomersPage() {
                     Joined{" "}
                     {format(new Date(customer.created_at), "MMM d, yyyy")}
                   </p>
-                  <Link href={`/admin/customers/${customer.id}`}>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <form action="/api/admin/impersonate" method="POST">
+                      <input
+                        type="hidden"
+                        name="targetCustomerId"
+                        value={customer.id}
+                      />
+                      <Button
+                        type="submit"
+                        variant="secondary"
+                        size="sm"
+                        title="View the portal as this customer"
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        View as
+                      </Button>
+                    </form>
+                    <Link href={`/admin/customers/${customer.id}`}>
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -117,11 +136,29 @@ export default async function AdminCustomersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/admin/customers/${customer.id}`}>
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <form action="/api/admin/impersonate" method="POST">
+                          <input
+                            type="hidden"
+                            name="targetCustomerId"
+                            value={customer.id}
+                          />
+                          <Button
+                            type="submit"
+                            variant="secondary"
+                            size="sm"
+                            title="View the portal as this customer"
+                          >
+                            <Eye className="mr-1 h-3 w-3" />
+                            View as
+                          </Button>
+                        </form>
+                        <Link href={`/admin/customers/${customer.id}`}>
+                          <Button variant="outline" size="sm">
+                            Edit
+                          </Button>
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveProfile } from "@/lib/impersonate";
 import {
   fetchOrderForCustomer,
   isSquareConfigured,
@@ -20,20 +21,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "missing id" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // Use the effective profile so an admin in "view as customer"
+  // mode pre-fills the cart from the IMPERSONATED customer's order,
+  // not from the admin's own order history.
+  const effective = await getEffectiveProfile();
+  if (!effective.profile || !effective.userId) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-
-  // Look up profile to know if this customer is Square-backed
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("square_customer_id")
-    .eq("id", user.id)
-    .single();
+  const profile = effective.profile;
+  const effectiveUserId = effective.userId;
 
   // Square path
   if (profile?.square_customer_id && isSquareConfigured()) {
@@ -62,8 +58,20 @@ export async function GET(request: Request) {
     }
   }
 
-  // Supabase fallback
-  const { data: rows, error } = await supabase
+  // Supabase fallback. Verify the order belongs to the effective
+  // customer (RLS would normally do this, but admin client bypasses
+  // RLS so we have to scope manually).
+  const adminSupabase = createAdminClient();
+  const { data: orderRow } = await adminSupabase
+    .from("orders")
+    .select("id")
+    .eq("id", orderId)
+    .eq("profile_id", effectiveUserId)
+    .maybeSingle();
+  if (!orderRow) {
+    return NextResponse.json({ error: "order not found" }, { status: 404 });
+  }
+  const { data: rows, error } = await adminSupabase
     .from("order_items")
     .select("id, product_name, size, quantity, unit_price_cents")
     .eq("order_id", orderId);
