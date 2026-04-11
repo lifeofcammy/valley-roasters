@@ -864,3 +864,207 @@ export async function cancelSquareSubscription(
     }
   );
 }
+
+/* ====================================================================
+ * RECURRING ORDER DISCOVERY — live read from Square
+ * --------------------------------------------------------------------
+ * Valley already has recurring invoices configured by Jackie directly
+ * in the Square Dashboard. These are separate from portal-created
+ * Subscription objects. To give the admin a unified view:
+ *
+ *   1. fetchAllSquareSubscriptions()  → formal Square Subscriptions
+ *   2. fetchSquareInvoices()          → recent invoices (we group by
+ *      customer to detect recurring patterns when no subscription
+ *      object exists)
+ *
+ * Both are cached for 5 minutes so the admin Orders page stays fast.
+ * ================================================================== */
+
+export type SquareSubscriptionDetail = {
+  id: string;
+  customer_id: string;
+  status: string; // ACTIVE, CANCELED, PAUSED, PENDING, DEACTIVATED
+  cadence: string; // WEEKLY, EVERY_TWO_WEEKS, MONTHLY, etc.
+  amount_cents: number;
+  start_date: string | null;
+  charged_through_date: string | null;
+  source_name: string | null;
+};
+
+/**
+ * Search all subscriptions at Valley's Square location. Returns both
+ * portal-created and Dashboard-created subscriptions.
+ */
+export async function fetchAllSquareSubscriptions(): Promise<
+  SquareSubscriptionDetail[]
+> {
+  const { locationId } = getConfig();
+  const results: SquareSubscriptionDetail[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const body: Record<string, unknown> = {
+      query: {
+        filter: {
+          location_ids: [locationId],
+        },
+      },
+    };
+    if (cursor) body.cursor = cursor;
+
+    const data = await squareFetch<{
+      subscriptions?: Array<{
+        id: string;
+        customer_id?: string;
+        status?: string;
+        start_date?: string;
+        charged_through_date?: string;
+        source?: { name?: string };
+        phases?: Array<{
+          cadence?: string;
+          pricing?: {
+            type?: string;
+            price_money?: SquareMoney;
+          };
+        }>;
+      }>;
+      cursor?: string;
+    }>("/v2/subscriptions/search", {
+      method: "POST",
+      body: JSON.stringify(body),
+      next: { revalidate: 300, tags: ["valley-recurring"] },
+    });
+
+    for (const s of data.subscriptions ?? []) {
+      const phase = s.phases?.[0];
+      results.push({
+        id: s.id,
+        customer_id: s.customer_id ?? "",
+        status: s.status ?? "UNKNOWN",
+        cadence: phase?.cadence ?? "UNKNOWN",
+        amount_cents: phase?.pricing?.price_money?.amount ?? 0,
+        start_date: s.start_date ?? null,
+        charged_through_date: s.charged_through_date ?? null,
+        source_name: s.source?.name ?? null,
+      });
+    }
+    cursor = data.cursor;
+  } while (cursor);
+
+  return results;
+}
+
+export type SquareInvoiceSummary = {
+  id: string;
+  invoice_number: string | null;
+  status: string;
+  customer_id: string;
+  customer_name: string | null;
+  amount_cents: number;
+  due_date: string | null;
+  created_at: string;
+  title: string | null;
+  public_url: string | null;
+  subscription_id: string | null;
+};
+
+/**
+ * Fetch recent invoices at Valley's Square location. The admin page
+ * groups these by customer to surface recurring billing patterns that
+ * exist outside of the Subscriptions API (i.e. Jackie's Dashboard-
+ * created recurring invoice series).
+ */
+export async function fetchSquareInvoices(opts?: {
+  limit?: number;
+}): Promise<SquareInvoiceSummary[]> {
+  const { locationId } = getConfig();
+  const body = {
+    query: {
+      filter: {
+        location_ids: [locationId],
+      },
+      sort: {
+        field: "INVOICE_SORT_DATE",
+        order: "DESC",
+      },
+    },
+    limit: Math.min(opts?.limit ?? 200, 200),
+  };
+
+  const data = await squareFetch<{
+    invoices?: Array<{
+      id: string;
+      invoice_number?: string;
+      status?: string;
+      primary_recipient?: {
+        customer_id?: string;
+        given_name?: string;
+        family_name?: string;
+        company_name?: string;
+        email_address?: string;
+      };
+      payment_requests?: Array<{
+        computed_amount_money?: SquareMoney;
+        due_date?: string;
+      }>;
+      created_at?: string;
+      title?: string;
+      public_url?: string;
+      subscription_id?: string;
+    }>;
+  }>("/v2/invoices/search", {
+    method: "POST",
+    body: JSON.stringify(body),
+    next: { revalidate: 300, tags: ["valley-recurring"] },
+  });
+
+  return (data.invoices ?? []).map((inv) => {
+    const pr = inv.payment_requests?.[0];
+    const r = inv.primary_recipient;
+    const customerName =
+      r?.company_name ||
+      [r?.given_name, r?.family_name].filter(Boolean).join(" ") ||
+      null;
+
+    return {
+      id: inv.id,
+      invoice_number: inv.invoice_number ?? null,
+      status: inv.status ?? "UNKNOWN",
+      customer_id: r?.customer_id ?? "",
+      customer_name: customerName,
+      amount_cents: pr?.computed_amount_money?.amount ?? 0,
+      due_date: pr?.due_date ?? null,
+      created_at: inv.created_at ?? "",
+      title: inv.title ?? null,
+      public_url: inv.public_url ?? null,
+      subscription_id: inv.subscription_id ?? null,
+    };
+  });
+}
+
+/** Convert Square cadence enum to a human label. */
+export function formatSquareCadence(cadence: string): string {
+  switch (cadence) {
+    case "WEEKLY":
+      return "Weekly";
+    case "EVERY_TWO_WEEKS":
+      return "Every 2 weeks";
+    case "THIRTY_DAYS":
+    case "SIXTY_DAYS":
+      return `Every ${cadence === "THIRTY_DAYS" ? 30 : 60} days`;
+    case "MONTHLY":
+      return "Monthly";
+    case "EVERY_TWO_MONTHS":
+      return "Every 2 months";
+    case "QUARTERLY":
+      return "Quarterly";
+    case "EVERY_FOUR_MONTHS":
+      return "Every 4 months";
+    case "EVERY_SIX_MONTHS":
+      return "Every 6 months";
+    case "ANNUAL":
+      return "Annually";
+    default:
+      return cadence;
+  }
+}
