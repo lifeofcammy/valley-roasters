@@ -182,13 +182,18 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="relative fade-up-delay-1">
-              <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden shadow-xl">
-                <Image
-                  src="https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=800&q=85"
-                  alt="Specialty grade coffee beans"
-                  fill
-                  className="object-cover"
-                />
+              <div className="relative h-[400px] sm:h-[500px] rounded-2xl overflow-hidden shadow-xl bg-[#1a120d]">
+                <video
+                  data-autoplay
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  className="absolute inset-0 w-full h-full object-cover"
+                >
+                  <source src="/videos/coffee-roasting.mp4" type="video/mp4" />
+                </video>
               </div>
             </div>
           </div>
