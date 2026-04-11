@@ -34,7 +34,7 @@ const recurringSchema = z
 const orderRequestSchema = z.object({
   items: z.array(cartItemSchema).min(1).max(50),
   recurring: recurringSchema,
-  client_nonce: z.string().min(8).max(64).optional(),
+  client_nonce: z.string().min(8).max(64),
 });
 
 type CartItem = z.infer<typeof cartItemSchema>;
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
     const items = body.items;
     const recurring = body.recurring ?? null;
-    const clientNonce = body.client_nonce ?? null;
+    const clientNonce = body.client_nonce;
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -160,25 +160,21 @@ export async function POST(request: Request) {
 
     // Idempotency pre-check: if the client re-submits with the same
     // nonce, return the existing order instead of creating a duplicate.
-    if (clientNonce) {
-      const { data: existing } = await adminSupabase
-        .from("orders")
-        .select(
-          "id, square_order_id, square_invoice_id, square_invoice_public_url"
-        )
-        .eq("profile_id", user.id)
-        .eq("client_nonce", clientNonce)
-        .maybeSingle();
-      if (existing) {
-        return NextResponse.json({
-          orderId: existing.id,
-          subscriptionId: null,
-          square_order_id: existing.square_order_id,
-          square_invoice_id: existing.square_invoice_id,
-          square_invoice_public_url: existing.square_invoice_public_url,
-          deduped: true,
-        });
-      }
+    const { data: existing } = await adminSupabase
+      .from("orders")
+      .select("id, square_order_id, square_invoice_id, square_invoice_public_url")
+      .eq("profile_id", user.id)
+      .eq("client_nonce", clientNonce)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json({
+        orderId: existing.id,
+        subscriptionId: null,
+        square_order_id: existing.square_order_id,
+        square_invoice_id: existing.square_invoice_id,
+        square_invoice_public_url: existing.square_invoice_public_url,
+        deduped: true,
+      });
     }
 
     // Validate Supabase-product prices server-side via RPC.
@@ -230,9 +226,8 @@ export async function POST(request: Request) {
       // Unique-constraint violation on client_nonce = race with a
       // concurrent duplicate submit. Return the existing order.
       if (
-        clientNonce &&
-        (orderError?.code === "23505" ||
-          orderError?.message?.includes("client_nonce"))
+        orderError?.code === "23505" ||
+        orderError?.message?.includes("client_nonce")
       ) {
         const { data: existing } = await adminSupabase
           .from("orders")

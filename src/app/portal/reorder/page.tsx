@@ -164,12 +164,26 @@ export default function ReorderPage() {
 
       if (res.ok) {
         if (makeRecurring) {
-          toast.success(
-            `Order placed and saved as a ${frequency} recurring order.`
-          );
-          router.push(
-            `/portal/subscriptions?placed=${encodeURIComponent(data.orderId ?? "")}`
-          );
+          if (data.subscriptionError) {
+            toast.error(
+              data.subscriptionError ||
+                "Your first order was placed, but the recurring schedule could not be created."
+            );
+            router.push(
+              `/portal/orders/placed?id=${encodeURIComponent(
+                data.orderId ?? ""
+              )}&scheduleError=1`
+            );
+          } else {
+            toast.success(
+              `Order placed and saved as a ${frequency} recurring order.`
+            );
+            router.push(
+              `/portal/subscriptions?placed=${encodeURIComponent(
+                data.orderId ?? ""
+              )}`
+            );
+          }
         } else {
           toast.success("Order received — check your email for the invoice.");
           router.push(

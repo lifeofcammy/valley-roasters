@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   Menu,
-  X,
   LogOut,
   LayoutDashboard,
   Package,
@@ -18,6 +17,13 @@ import {
   Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 /**
  * Icon names that can be passed from Server Components → MobileNav.
@@ -194,27 +200,20 @@ export function MobileNav({
       </header>
 
       {/* Mobile drawer */}
-      {open && (
-        <div className="sm:hidden fixed inset-0 z-50 flex">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          />
-          <div className="relative flex flex-col w-4/5 max-w-xs bg-foreground text-background h-full overflow-y-auto shadow-xl">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close menu"
-              className="absolute top-3 right-3 p-2 rounded-md text-background/70 hover:text-background hover:bg-background/10 z-10"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            {navBody}
-          </div>
-        </div>
-      )}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent
+          side="left"
+          className="sm:hidden w-4/5 max-w-xs border-r-0 bg-foreground p-0 text-background"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{primaryLabel} navigation</SheetTitle>
+            <SheetDescription>
+              Use this menu to move between portal sections.
+            </SheetDescription>
+          </SheetHeader>
+          {navBody}
+        </SheetContent>
+      </Sheet>
 
       {/* Desktop sidebar */}
       <aside className="hidden sm:flex sm:flex-col sm:w-64 bg-foreground text-background flex-shrink-0 sticky top-0 h-screen max-h-screen overflow-y-auto">

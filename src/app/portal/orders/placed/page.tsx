@@ -8,9 +8,9 @@ import { CheckCircle2, Mail, Package, Truck } from "lucide-react";
 export default async function OrderPlacedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string }>;
+  searchParams: Promise<{ id?: string; scheduleError?: string }>;
 }) {
-  const { id } = await searchParams;
+  const { id, scheduleError } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -133,6 +133,15 @@ export default async function OrderPlacedPage({
             </a>
             .
           </div>
+
+          {scheduleError === "1" && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              <strong>Recurring schedule not created:</strong> your first order
+              was received, but the automatic repeat schedule did not save. If
+              you still want recurring deliveries, please contact Valley so we
+              can set it up for you.
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Link href="/portal/orders" className="flex-1">
