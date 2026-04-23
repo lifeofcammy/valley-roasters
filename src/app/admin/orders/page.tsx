@@ -13,7 +13,13 @@ import {
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { displayStatusName } from "@/lib/order-status";
 import { format } from "date-fns";
-import { ChevronRight, Repeat, CalendarClock, FileText } from "lucide-react";
+import {
+  ChevronRight,
+  Repeat,
+  CalendarClock,
+  FileText,
+  ExternalLink,
+} from "lucide-react";
 import {
   isSquareConfigured,
   fetchAllSquareSubscriptions,
@@ -214,6 +220,29 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
   const endRow = Math.min(fromIdx + PAGE_SIZE, totalRows);
 
   /* --------------------------------------------------------------- */
+  /* 3. Square-native invoices — invoices that exist in Square but   */
+  /*    NOT in Supabase. These originated in Square (Jackie's phone, */
+  /*    POS, manual invoice) and are shown read-only here for        */
+  /*    visibility. Edits happen in Square.                          */
+  /* --------------------------------------------------------------- */
+  // Pull tracked invoice ids across ALL orders (not just this page)
+  // so we correctly de-dupe — otherwise an order on page 2 with a
+  // square_invoice_id would still show up in the Square-only list
+  // on page 1.
+  const { data: allTrackedIds } = await admin
+    .from("orders")
+    .select("square_invoice_id")
+    .not("square_invoice_id", "is", null);
+  const trackedInvoiceIds = new Set(
+    (allTrackedIds ?? [])
+      .map((r) => r.square_invoice_id)
+      .filter((v): v is string => typeof v === "string")
+  );
+  const squareOnlyInvoices = squareInvoices.filter(
+    (inv) => !trackedInvoiceIds.has(inv.id)
+  );
+
+  /* --------------------------------------------------------------- */
   /* Render                                                          */
   /* --------------------------------------------------------------- */
   return (
@@ -320,6 +349,123 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
                           <Badge variant="outline" className="text-xs">
                             {r.invoice_count} invoices
                           </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </details>
+      )}
+
+      {/* ---- Square-native invoices (not on website) ---- */}
+      {squareOnlyInvoices.length > 0 && (
+        <details className="mb-6 border rounded-lg bg-card group" open>
+          <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none hover:bg-muted/60 transition-colors rounded-lg text-sm font-medium">
+            <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+            <span>
+              {squareOnlyInvoices.length} Square-only invoice
+              {squareOnlyInvoices.length !== 1 ? "s" : ""}{" "}
+              <span className="text-muted-foreground font-normal">
+                (created in Square — edit there)
+              </span>
+            </span>
+            <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+          </summary>
+          <div className="border-t">
+            {/* Mobile list */}
+            <div className="md:hidden divide-y">
+              {squareOnlyInvoices.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">
+                      {inv.customer_name ?? "Unknown"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {inv.invoice_number
+                        ? `#${inv.invoice_number} · `
+                        : ""}
+                      {format(new Date(inv.created_at), "MMM d, yyyy")}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {inv.status}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        From Square
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="font-semibold text-sm whitespace-nowrap">
+                      ${(inv.amount_cents / 100).toFixed(2)}
+                    </span>
+                    {inv.public_url && (
+                      <a
+                        href={inv.public_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        View <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Square Status</TableHead>
+                    <TableHead>View</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {squareOnlyInvoices.map((inv) => (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">
+                        {inv.invoice_number ? `#${inv.invoice_number}` : "—"}
+                      </TableCell>
+                      <TableCell>{inv.customer_name ?? "Unknown"}</TableCell>
+                      <TableCell>
+                        {format(new Date(inv.created_at), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        ${(inv.amount_cents / 100).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {inv.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {inv.public_url ? (
+                          <a
+                            href={inv.public_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline inline-flex items-center gap-1 text-sm"
+                          >
+                            Open in Square
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            —
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
