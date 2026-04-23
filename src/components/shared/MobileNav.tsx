@@ -123,19 +123,35 @@ export function MobileNav({
         )}
       </div>
       <nav className="p-2 space-y-1 flex-1">
-        {links.map((link) => {
+        {links.map((link, index) => {
           const Icon = NAV_ICONS[link.icon] ?? Package;
           const isAccent = link.variant === "accent";
+          // Accent links (like "Back to Admin") render as a filled button
+          // so they're visually distinct from regular nav items. Also
+          // separated from the rest of the list with a divider below.
+          if (isAccent) {
+            return (
+              <div key={link.href}>
+                <Link
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 min-h-11 text-sm font-semibold text-foreground bg-secondary hover:bg-secondary/90 rounded-md transition-colors shadow-sm"
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{link.label}</span>
+                </Link>
+                {index < links.length - 1 && (
+                  <div className="border-t border-background/10 my-2" />
+                )}
+              </div>
+            );
+          }
           return (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
-              className={
-                isAccent
-                  ? "flex items-center gap-3 px-3 py-3 min-h-11 text-sm text-secondary hover:text-secondary/80 hover:bg-background/10 rounded-md transition-colors"
-                  : "flex items-center gap-3 px-3 py-3 min-h-11 text-sm text-background/70 hover:text-background hover:bg-background/10 rounded-md transition-colors"
-              }
+              className="flex items-center gap-3 px-3 py-3 min-h-11 text-sm text-background/70 hover:text-background hover:bg-background/10 rounded-md transition-colors"
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">{link.label}</span>
