@@ -1042,6 +1042,112 @@ export async function fetchSquareInvoices(opts?: {
   });
 }
 
+/* ------------------------------------------------------------- */
+/* Invoice state transitions — publish (send) + cancel           */
+/* ------------------------------------------------------------- */
+
+/**
+ * Fetch the current version number of an invoice. Square's mutation
+ * endpoints require the caller to pass the current version so concurrent
+ * edits from two places can't silently clobber each other.
+ */
+async function fetchInvoiceVersion(invoiceId: string): Promise<number> {
+  const data = await squareFetch<{ invoice?: { version?: number } }>(
+    `/v2/invoices/${encodeURIComponent(invoiceId)}`,
+    { method: "GET" }
+  );
+  return data.invoice?.version ?? 0;
+}
+
+/**
+ * Publish a DRAFT Square invoice. Square's server then emails the invoice
+ * to the customer via the delivery method on the invoice (our invoices
+ * are always `delivery_method: "EMAIL"`).
+ *
+ * `idempotencyKey` should be stable per (orderId, transition) — the admin
+ * can click "In process" more than once without generating duplicate sends.
+ */
+export async function publishSquareInvoice(
+  invoiceId: string,
+  idempotencyKey: string
+): Promise<{ status: string; public_url?: string }> {
+  const version = await fetchInvoiceVersion(invoiceId);
+  const data = await squareFetch<{
+    invoice?: { status?: string; public_url?: string };
+  }>(`/v2/invoices/${encodeURIComponent(invoiceId)}/publish`, {
+    method: "POST",
+    body: JSON.stringify({
+      version,
+      idempotency_key: idempotencyKey,
+    }),
+  });
+  return {
+    status: data.invoice?.status ?? "UNPAID",
+    public_url: data.invoice?.public_url,
+  };
+}
+
+/**
+ * Cancel a Square invoice. `reason` is folded into the invoice's
+ * `description` so Jackie (and the customer, via the cancellation email
+ * Square sends) can see why the order was rejected.
+ *
+ * Flow:
+ *   1. PUT /v2/invoices/{id} to append the reason to `description`.
+ *   2. POST /v2/invoices/{id}/cancel to move the invoice to CANCELED.
+ * Square auto-emails the cancellation notice to the customer.
+ */
+export async function cancelSquareInvoice(
+  invoiceId: string,
+  reason: string
+): Promise<{ status: string }> {
+  // Step 1: append reason to description so it appears on the cancellation
+  // email Square sends.
+  const current = await squareFetch<{
+    invoice?: { version?: number; description?: string };
+  }>(`/v2/invoices/${encodeURIComponent(invoiceId)}`, { method: "GET" });
+
+  const currentVersion = current.invoice?.version ?? 0;
+  const existingDesc = current.invoice?.description ?? "";
+  const rejectionLine = `Order rejected: ${reason}`;
+  const newDescription = existingDesc
+    ? `${existingDesc}\n\n${rejectionLine}`
+    : rejectionLine;
+
+  try {
+    await squareFetch(`/v2/invoices/${encodeURIComponent(invoiceId)}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        invoice: {
+          version: currentVersion,
+          description: newDescription,
+        },
+        idempotency_key: `cancel-update-${invoiceId}-${currentVersion}`,
+      }),
+    });
+  } catch (err) {
+    // If the update fails (e.g. invoice already in a state that
+    // disallows editing), still attempt the cancel — the reason just
+    // won't be embedded in the email. Log for debugging.
+    console.warn(
+      `[square] could not update invoice description before cancel: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+
+  // Step 2: cancel. Re-fetch version because the PUT bumped it.
+  const latestVersion = await fetchInvoiceVersion(invoiceId);
+  const data = await squareFetch<{ invoice?: { status?: string } }>(
+    `/v2/invoices/${encodeURIComponent(invoiceId)}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ version: latestVersion }),
+    }
+  );
+  return { status: data.invoice?.status ?? "CANCELED" };
+}
+
 /** Convert Square cadence enum to a human label. */
 export function formatSquareCadence(cadence: string): string {
   switch (cadence) {

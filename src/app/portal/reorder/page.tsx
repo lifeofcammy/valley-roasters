@@ -14,8 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, ShoppingCart, Loader2, Repeat } from "lucide-react";
+import { Trash2, ShoppingCart, Loader2, Repeat, Truck } from "lucide-react";
 import { toast } from "sonner";
+import {
+  calculateDeliveryFeeCents,
+  DELIVERY_FEE_FREE_THRESHOLD_CENTS,
+} from "@/lib/constants";
 
 interface Product {
   id: string;
@@ -41,6 +45,10 @@ export default function ReorderPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const fromOrderId = searchParams.get("from");
+  // Deep-link from /portal/catalog — pre-fill cart with one SKU.
+  // `sku` is the Square catalog item id, `variation` is optional
+  // (falls back to "1lb" if missing).
+  const skuParam = searchParams.get("sku");
   const supabase = createClient();
   const { isImpersonating } = useImpersonation();
 
@@ -115,11 +123,46 @@ export default function ReorderPage() {
         }
       }
 
+      // Deep-link from catalog — pre-fill with one SKU. We fetch the
+      // item from Square via the catalog API to resolve its name and
+      // first-variation price on the fly.
+      if (skuParam && !fromOrderId) {
+        try {
+          const res = await fetch(
+            `/api/portal/catalog-item?id=${encodeURIComponent(skuParam)}`,
+            { credentials: "include" }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.item) {
+              const item = data.item as {
+                name: string;
+                variations: Array<{ id: string; name: string; price_cents: number }>;
+              };
+              const first = item.variations[0];
+              if (first) {
+                setCart([
+                  {
+                    product_id: null,
+                    product_name: item.name,
+                    size: first.name || "1lb",
+                    quantity: 1,
+                    unit_price_cents: first.price_cents,
+                  },
+                ]);
+              }
+            }
+          }
+        } catch {
+          // Best-effort; user can still build cart manually
+        }
+      }
+
       setLoading(false);
     }
 
     loadData();
-  }, [fromOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fromOrderId, skuParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateCartItem(index: number, updates: Partial<CartItem>) {
     setCart((prev) =>
@@ -134,6 +177,12 @@ export default function ReorderPage() {
   const subtotal = cart.reduce(
     (sum, item) => sum + item.unit_price_cents * item.quantity,
     0
+  );
+  const deliveryFee = calculateDeliveryFeeCents(subtotal);
+  const total = subtotal + deliveryFee;
+  const remainingForFreeShipping = Math.max(
+    0,
+    DELIVERY_FEE_FREE_THRESHOLD_CENTS - subtotal
   );
 
   async function handlePlaceOrder() {
@@ -336,14 +385,50 @@ export default function ReorderPage() {
                 ))}
               </div>
 
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Subtotal</span>
-                  <span>${(subtotal / 100).toFixed(2)}</span>
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">
+                    ${(subtotal / 100).toFixed(2)}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  We&apos;ll confirm pricing, shipping, and payment after you
-                  place your order.
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Truck className="h-3.5 w-3.5" />
+                    Delivery
+                  </span>
+                  {deliveryFee > 0 ? (
+                    <span className="font-medium">
+                      ${(deliveryFee / 100).toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                      FREE
+                    </span>
+                  )}
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <span>Total</span>
+                  <span>${(total / 100).toFixed(2)}</span>
+                </div>
+                {remainingForFreeShipping > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Add{" "}
+                    <strong>
+                      ${(remainingForFreeShipping / 100).toFixed(2)}
+                    </strong>{" "}
+                    more for free delivery (orders $
+                    {(DELIVERY_FEE_FREE_THRESHOLD_CENTS / 100).toFixed(0)}+
+                    ship free).
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    You&apos;ve qualified for free delivery.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  We&apos;ll confirm pricing and payment after you place your
+                  order.
                 </p>
               </div>
 

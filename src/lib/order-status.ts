@@ -8,12 +8,12 @@
  */
 
 export type DisplayStatusKey =
-  | "cancelled"
+  | "rejected"
   | "delivered"
   | "shipped"
-  | "in_production"
+  | "in_process"
   | "invoice_sent"
-  | "awaiting_review";
+  | "received";
 
 export interface DisplayStatus {
   key: DisplayStatusKey;
@@ -35,16 +35,23 @@ export function getDisplayStatus(order: OrderForStatus): DisplayStatus {
   const paymentStatus = (order.payment_status ?? "").toLowerCase();
   const squareInvoice = (order.square_invoice_status ?? "").toUpperCase();
 
-  if (status === "cancelled" || squareInvoice === "CANCELED") {
+  // Rejected / cancelled — terminal failure state
+  if (
+    status === "rejected" ||
+    status === "cancelled" ||
+    squareInvoice === "CANCELED"
+  ) {
     return {
-      key: "cancelled",
-      label: "Cancelled",
-      description: "This order was cancelled.",
+      key: "rejected",
+      label: "Rejected",
+      description:
+        "This order was rejected. Check the cancellation email from Square for details.",
       className:
         "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
     };
   }
 
+  // Delivered — legacy status, still renders for historical rows
   if (status === "delivered") {
     return {
       key: "delivered",
@@ -55,6 +62,7 @@ export function getDisplayStatus(order: OrderForStatus): DisplayStatus {
     };
   }
 
+  // Shipped — admin-set; terminal state in the new 4-status model
   if (status === "shipped") {
     return {
       key: "shipped",
@@ -65,11 +73,26 @@ export function getDisplayStatus(order: OrderForStatus): DisplayStatus {
     };
   }
 
+  // In process — either the admin flipped the status OR the invoice was
+  // published (Square emailed the buyer their invoice = we've begun work).
+  // `roasting` is the legacy value from before the 4-status simplification.
+  if (status === "in_process" || status === "roasting") {
+    return {
+      key: "in_process",
+      label: "In process",
+      description:
+        "We've started preparing your order. You'll hear from us again when it ships.",
+      className:
+        "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300",
+    };
+  }
+
   if (paymentStatus === "paid" || squareInvoice === "PAID") {
     return {
-      key: "in_production",
-      label: "Paid — in production",
-      description: "We received your payment and have begun preparing your order.",
+      key: "in_process",
+      label: "Paid — in process",
+      description:
+        "We received your payment and have begun preparing your order.",
       className:
         "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
     };
@@ -86,38 +109,67 @@ export function getDisplayStatus(order: OrderForStatus): DisplayStatus {
     };
   }
 
-  // Default: DRAFT invoice or no invoice yet — waiting on Valley to review
+  // Default: DRAFT invoice or no invoice yet — order received, not yet started
   return {
-    key: "awaiting_review",
-    label: "Awaiting review",
+    key: "received",
+    label: "Order received",
     description:
-      "Our team is reviewing your order. You'll receive an invoice by email shortly.",
+      "We got your order and will send you an invoice shortly. Nothing to do on your end.",
     className:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300",
   };
 }
 
 /**
- * Humanize a raw order.status value for display. The DB value
- * 'roasting' is an historical label — we display "In production"
- * because Valley also fulfills non-coffee items.
+ * Humanize a raw order.status value for display. Handles both the
+ * canonical 4-status model (`received` / `in_process` / `shipped` /
+ * `rejected`) and legacy values still present on historical rows
+ * (`pending`, `confirmed`, `roasting`, `delivered`, `cancelled`).
  */
 export function displayStatusName(status: string | null | undefined): string {
   const s = (status ?? "").toLowerCase();
   switch (s) {
-    case "pending":
-      return "Pending";
-    case "confirmed":
-      return "Confirmed";
-    case "roasting":
-      return "In production";
+    // Canonical 4
+    case "received":
+      return "Order received";
+    case "in_process":
+      return "In process";
     case "shipped":
       return "Shipped";
+    case "rejected":
+      return "Rejected";
+    // Legacy — map to the closest canonical label
+    case "pending":
+      return "Order received";
+    case "confirmed":
+      return "Order received";
+    case "roasting":
+      return "In process";
     case "delivered":
       return "Delivered";
     case "cancelled":
-      return "Cancelled";
+      return "Rejected";
     default:
       return s ? s.charAt(0).toUpperCase() + s.slice(1) : "—";
   }
+}
+
+/**
+ * Map any raw status value (legacy or canonical) to the single
+ * canonical admin-selectable value. Used when rendering the admin
+ * `<Select>` defaultValue so legacy rows land on the right option.
+ */
+export function toCanonicalStatus(
+  status: string | null | undefined
+):
+  | "received"
+  | "in_process"
+  | "shipped"
+  | "rejected" {
+  const s = (status ?? "").toLowerCase();
+  if (s === "in_process" || s === "roasting") return "in_process";
+  if (s === "shipped") return "shipped";
+  if (s === "rejected" || s === "cancelled") return "rejected";
+  // received, pending, confirmed, anything else → received
+  return "received";
 }

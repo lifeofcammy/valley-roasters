@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getDisplayStatus } from "@/lib/order-status";
+import { getDisplayStatus, toCanonicalStatus } from "@/lib/order-status";
 import { RotateCcw, Eye, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -60,25 +60,60 @@ export default async function OrdersPage() {
     const squareId = profile.square_customer_id;
 
     if (squareId && isSquareConfigured()) {
-      // Read order history from Square (source of truth for wholesale)
+      // Read order history from Square (source of truth for wholesale).
+      // For each Square order, we also look up the matching Supabase row
+      // by `square_order_id` so admin-set statuses like "shipped" /
+      // "in_process" / "rejected" overlay the raw Square state.
       try {
         const squareOrders = await fetchCustomerOrders(squareId, 50);
-        orders = squareOrders.map((o) => ({
-          id: o.id,
-          source: "square" as const,
-          order_number: o.id.slice(-6).toUpperCase(),
-          created_at: o.created_at ?? "",
-          total_cents: Math.round(moneyToDollars(o.total_money) * 100),
-          status: squareStateToStatus(o.state),
-          payment_status:
-            (o.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
-          square_invoice_status: null,
-          item_count:
-            o.line_items?.reduce(
-              (sum, li) => sum + (parseFloat(li.quantity ?? "0") || 0),
-              0
-            ) ?? 0,
-        }));
+
+        // Batch look up Supabase overlays in one query.
+        const squareOrderIds = squareOrders.map((o) => o.id).filter(Boolean);
+        const overlayMap = new Map<
+          string,
+          { status: string | null; square_invoice_status: string | null }
+        >();
+        if (squareOrderIds.length > 0) {
+          const adminSupabase = createAdminClient();
+          const { data: overlays } = await adminSupabase
+            .from("orders")
+            .select("square_order_id, status, square_invoice_status")
+            .in("square_order_id", squareOrderIds);
+          for (const row of overlays ?? []) {
+            if (row.square_order_id) {
+              overlayMap.set(row.square_order_id, {
+                status: row.status ?? null,
+                square_invoice_status: row.square_invoice_status ?? null,
+              });
+            }
+          }
+        }
+
+        orders = squareOrders.map((o) => {
+          const overlay = overlayMap.get(o.id);
+          // Prefer admin-set status if we have one; fall back to the
+          // value derived from Square's order state.
+          const squareDerivedStatus = squareStateToStatus(o.state);
+          const mergedStatus = overlay?.status
+            ? toCanonicalStatus(overlay.status)
+            : squareDerivedStatus;
+          return {
+            id: o.id,
+            source: "square" as const,
+            order_number: o.id.slice(-6).toUpperCase(),
+            created_at: o.created_at ?? "",
+            total_cents: Math.round(moneyToDollars(o.total_money) * 100),
+            status: mergedStatus,
+            payment_status:
+              (o.tenders?.length ?? 0) > 0 ? "paid" : "unpaid",
+            square_invoice_status: overlay?.square_invoice_status ?? null,
+            item_count:
+              o.line_items?.reduce(
+                (sum, li) => sum + (parseFloat(li.quantity ?? "0") || 0),
+                0
+              ) ?? 0,
+          };
+        });
         dataSource = "square";
       } catch (err) {
         // Log the real error for server logs, but show a generic

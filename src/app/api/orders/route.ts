@@ -10,6 +10,10 @@ import {
   createSquareSubscriptionPlan,
   isSquareConfigured,
 } from "@/lib/square/client";
+import {
+  calculateDeliveryFeeCents,
+  DELIVERY_FEE_LABEL,
+} from "@/lib/constants";
 
 /* ------------------------------------------------------------- */
 /* Zod schema — runtime-validates every field before any write.   */
@@ -203,15 +207,21 @@ export async function POST(request: Request) {
       0
     );
 
-    // 1. Save order in Supabase
+    // Delivery fee: $5 flat on orders below $300. Jackie previously added
+    // this manually to Square invoices; it's now automatic.
+    const deliveryFeeCents = calculateDeliveryFeeCents(subtotalCents);
+    const totalCents = subtotalCents + deliveryFeeCents;
+
+    // 1. Save order in Supabase. The delivery fee rolls into total_cents;
+    //    subtotal_cents stays as the pre-fee amount for clarity.
     const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
         profile_id: user.id,
-        status: "pending",
+        status: "received",
         subtotal_cents: subtotalCents,
         tax_cents: 0,
-        total_cents: subtotalCents,
+        total_cents: totalCents,
         payment_status: "unpaid",
         shipping_address_line1: profile.company_address_line1,
         shipping_city: profile.company_city,
@@ -290,16 +300,28 @@ export async function POST(request: Request) {
       try {
         const autoPublish = await getAutoPublishInvoices();
 
+        // Assemble Square line items. Append a "Delivery" line only when
+        // the fee applies — orders at/over the free-shipping threshold
+        // don't see it at all.
+        const squareLineItems = validatedItems.map((it) => ({
+          name: it.product_name,
+          quantity: it.quantity,
+          unit_price_cents: it.unit_price_cents,
+        }));
+        if (deliveryFeeCents > 0) {
+          squareLineItems.push({
+            name: DELIVERY_FEE_LABEL,
+            quantity: 1,
+            unit_price_cents: deliveryFeeCents,
+          });
+        }
+
         const created = await createSquareOrder({
           squareCustomerId: profile.square_customer_id,
           idempotencyKey: `portal-order-${order.id}`,
           referenceId: String(order.order_number),
           note: `Valley portal order #${order.order_number}`,
-          lineItems: validatedItems.map((it) => ({
-            name: it.product_name,
-            quantity: it.quantity,
-            unit_price_cents: it.unit_price_cents,
-          })),
+          lineItems: squareLineItems,
         });
 
         const inv = await createSquareInvoice({
@@ -359,7 +381,10 @@ export async function POST(request: Request) {
               recurring.label ??
               `${profile.company_name ?? "Wholesale"} ${recurring.frequency}`,
             frequency: recurring.frequency,
-            totalAmountCents: subtotalCents,
+            // Subscription price includes the same delivery fee policy
+            // as the one-off order that spawned it — if the first order
+            // got charged $5 shipping, so do subsequent ones.
+            totalAmountCents: totalCents,
             idempotencyKey: `portal-sub-plan-${order.id}`,
           });
           squarePlanId = plan.square_plan_id;

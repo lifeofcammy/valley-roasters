@@ -37,6 +37,7 @@ export type NavIconName =
   | "messages"
   | "customers"
   | "products"
+  | "catalog"
   | "back"
   | "reorder"
   | "settings"
@@ -48,6 +49,7 @@ const NAV_ICONS: Record<NavIconName, ComponentType<{ className?: string }>> = {
   messages: Mail,
   customers: Users,
   products: Coffee,
+  catalog: Coffee,
   back: ArrowLeft,
   reorder: RotateCcw,
   settings: Settings,

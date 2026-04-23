@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,12 +24,17 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  ADMIN_SELECTABLE_STATUSES,
   ORDER_STATUS_COLORS,
-  ORDER_STATUSES,
   type OrderStatus,
 } from "@/lib/constants";
 import { ArrowLeft } from "lucide-react";
-import { displayStatusName } from "@/lib/order-status";
+import { displayStatusName, toCanonicalStatus } from "@/lib/order-status";
+import {
+  publishSquareInvoice,
+  cancelSquareInvoice,
+  isSquareConfigured,
+} from "@/lib/square/client";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -58,24 +64,124 @@ export default async function AdminOrderDetailPage({
   async function updateStatus(formData: FormData) {
     "use server";
     await assertAdmin();
-    const ALLOWED = ["pending","confirmed","roasting","shipped","delivered","cancelled"] as const;
+
     const raw = String(formData.get("status") ?? "");
-    if (!(ALLOWED as readonly string[]).includes(raw)) {
+    if (!(ADMIN_SELECTABLE_STATUSES as readonly string[]).includes(raw)) {
       throw new Error("Invalid status");
     }
-    const newStatus = raw;
-    const adminNotes = formData.get("admin_notes") as string;
-    const supabase = await createClient();
+    const newStatus = raw as (typeof ADMIN_SELECTABLE_STATUSES)[number];
+    const adminNotes = (formData.get("admin_notes") as string) ?? "";
+    const rejectionReason = (
+      (formData.get("rejection_reason") as string) ?? ""
+    ).trim();
 
-    await supabase
+    if (newStatus === "rejected" && rejectionReason.length === 0) {
+      throw new Error(
+        "Rejection reason is required — this goes to the customer."
+      );
+    }
+
+    // Re-read the current order (admin client — we need square_invoice_id
+    // and the prior status for transition detection, even though the outer
+    // page read already loaded it).
+    const admin = createAdminClient();
+    const { data: current, error: readErr } = await admin
+      .from("orders")
+      .select(
+        "id, status, admin_notes, square_invoice_id, square_invoice_status"
+      )
+      .eq("id", id)
+      .single();
+    if (readErr || !current) {
+      throw new Error("Order not found");
+    }
+
+    const previousCanonical = toCanonicalStatus(current.status);
+    const isTransition = previousCanonical !== newStatus;
+
+    // Compose final admin_notes — prepend rejection reason when rejecting
+    // so it's visible above older notes on subsequent views.
+    const finalNotes =
+      newStatus === "rejected" && rejectionReason
+        ? `REJECTED (${new Date().toISOString().slice(0, 10)}): ${rejectionReason}${
+            adminNotes ? `\n\n${adminNotes}` : ""
+          }`
+        : adminNotes;
+
+    // Mirror the transition into Square if we can. Failures here are
+    // logged but do NOT block the DB update — the admin can retry the
+    // Square side manually from the Square dashboard if needed.
+    let squareInvoiceStatus: string | null = current.square_invoice_status;
+    let squareSyncError: string | null = null;
+
+    if (
+      isTransition &&
+      current.square_invoice_id &&
+      isSquareConfigured()
+    ) {
+      try {
+        if (newStatus === "in_process") {
+          // Publish DRAFT → Square emails the invoice to the customer.
+          // Skip if the invoice has already been published (UNPAID/PAID)
+          // to avoid a duplicate send.
+          const alreadyPublished =
+            current.square_invoice_status === "UNPAID" ||
+            current.square_invoice_status === "PAID" ||
+            current.square_invoice_status === "SCHEDULED";
+          if (!alreadyPublished) {
+            const pub = await publishSquareInvoice(
+              current.square_invoice_id,
+              `publish-${id}`
+            );
+            squareInvoiceStatus = (pub.status ?? "UNPAID").toUpperCase();
+          }
+        } else if (newStatus === "rejected") {
+          // Cancel invoice with reason in memo → Square emails cancellation.
+          // Don't cancel if already canceled or paid.
+          const skip =
+            current.square_invoice_status === "CANCELED" ||
+            current.square_invoice_status === "PAID" ||
+            current.square_invoice_status === "REFUNDED";
+          if (!skip) {
+            const cancelled = await cancelSquareInvoice(
+              current.square_invoice_id,
+              rejectionReason
+            );
+            squareInvoiceStatus = (cancelled.status ?? "CANCELED").toUpperCase();
+          }
+        }
+        // newStatus === "shipped" or "received" → DB-only update; no
+        // Square-side action. See HANDOFF.md for why "Shipped" has no
+        // automated email (Square has no shipping notification).
+      } catch (err) {
+        console.error("[admin status update] Square sync failed:", err);
+        squareSyncError =
+          err instanceof Error ? err.message : "Square sync failed";
+      }
+    }
+
+    const { error: updErr } = await admin
       .from("orders")
       .update({
         status: newStatus,
-        admin_notes: adminNotes,
+        admin_notes: finalNotes,
+        ...(squareInvoiceStatus
+          ? { square_invoice_status: squareInvoiceStatus }
+          : {}),
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id);
 
+    if (updErr) {
+      throw new Error(
+        squareSyncError
+          ? `DB update failed after Square sync: ${updErr.message} (Square: ${squareSyncError})`
+          : `DB update failed: ${updErr.message}`
+      );
+    }
+
     revalidatePath(`/admin/orders/${id}`);
+    revalidatePath(`/admin/orders`);
   }
 
   const profile = order.profiles as {
@@ -235,23 +341,21 @@ export default async function AdminOrderDetailPage({
               <form action={updateStatus} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Order Status</Label>
-                  <Select name="status" defaultValue={order.status}>
+                  <Select
+                    name="status"
+                    defaultValue={toCanonicalStatus(order.status)}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {ORDER_STATUSES.map((status) => {
-                        // Fix B — soft lock: fulfillment statuses are
-                        // disabled until payment has landed. The admin
-                        // can still override by toggling the "trust"
-                        // checkbox below the dropdown.
-                        const lockedWhenUnpaid = [
-                          "roasting",
-                          "shipped",
-                          "delivered",
-                        ];
+                      {ADMIN_SELECTABLE_STATUSES.map((status) => {
+                        // Soft-lock "Shipped" until the invoice is paid —
+                        // shipping before getting paid is the costly failure
+                        // mode. "In process" is NOT locked: publishing the
+                        // invoice is what produces the payment link.
                         const locked =
-                          lockedWhenUnpaid.includes(status) &&
+                          status === "shipped" &&
                           order.payment_status !== "paid";
                         return (
                           <SelectItem
@@ -266,13 +370,36 @@ export default async function AdminOrderDetailPage({
                       })}
                     </SelectContent>
                   </Select>
-                  {order.payment_status !== "paid" && (
-                    <p className="text-xs text-muted-foreground">
-                      Fulfillment statuses unlock automatically once the
-                      Square invoice is paid.
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Picking <strong>In process</strong> publishes the Square
+                    invoice and emails it to the customer.{" "}
+                    <strong>Rejected</strong> cancels the invoice with the
+                    reason you provide.{" "}
+                    <strong>Shipped</strong> updates the dashboard only — no
+                    email is sent (Square has no shipping notification; send
+                    a note manually from Square if needed).
+                  </p>
                 </div>
+
+                {/* Rejection reason — only relevant when picking Rejected,
+                    but we render it always so the server action can read it
+                    off the form without JS. The server enforces the required
+                    rule when status='rejected'. */}
+                <div className="space-y-2">
+                  <Label htmlFor="rejection_reason">
+                    Rejection reason{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (required if picking Rejected — goes to the customer)
+                    </span>
+                  </Label>
+                  <Textarea
+                    id="rejection_reason"
+                    name="rejection_reason"
+                    placeholder="e.g. Out of stock on Brazil Natural — expected back 2 weeks. Please reorder then or pick an alternate."
+                    rows={2}
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label>Admin Notes</Label>
                   <Textarea

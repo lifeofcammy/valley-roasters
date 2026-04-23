@@ -52,8 +52,10 @@ dashboard for managing customers, orders, and content.
 ```
 
 **Key principle:** Square is the system of record. The website is a customer-
-facing portal that reads from Square (today) and will write back to Square
-(in a future session). Valley never has to maintain two systems.
+facing portal that both **reads from** and **writes back to** Square — every
+portal order becomes a Square Order + draft Invoice automatically, and Square
+webhook events are mirrored back into Supabase in real time. Valley never has
+to maintain two systems.
 
 ---
 
@@ -86,13 +88,23 @@ inbox holds the keys.
 - **Plan:** Free tier (50K monthly active users)
 
 ### 5. Payments + Orders — Square
-- **Provider:** Square (replaces the original Stripe plan)
+- **Provider:** Square (Stripe was removed entirely; no Stripe code or accounts
+  remain)
 - **App:** Production access token already provisioned
 - **Application ID:** `sq0idp-D9ddWtjh6LJ4PutoqDhUjg`
 - **Location ID for Valley:** `LRA1MTWS2VGAM`
-- **Today the website only READS from Square** (order history, customer info).
-  Writing new orders + accepting payments through the website is the next
-  development phase — see "What's pending" below.
+- **The website both reads from and writes to Square:**
+  - Reads: order history, customer info, live coffee catalog (all SKUs +
+    images + variations + prices), active subscriptions and recurring invoice
+    patterns.
+  - Writes: every portal order → Square Order + DRAFT Invoice; every recurring
+    portal order → Square Subscription Plan + Subscription (Square runs the
+    schedule).
+- **Webhook receiver** at `/api/webhooks/square` mirrors Square events back
+  into Supabase (see "Square webhook setup" below).
+- **In-portal credit card capture** (Square Web Payments SDK) is not yet
+  wired — invoices are paid via the Square-hosted public link emailed to the
+  customer. Adding the embedded card widget is in the pending list.
 
 ### 6. Source Code — GitHub
 - **Repo:** https://github.com/lifeofcammy/valley-roasters (private)
@@ -113,9 +125,14 @@ SQUARE_ENVIRONMENT=production
 SQUARE_LOCATION_ID=LRA1MTWS2VGAM
 NEXT_PUBLIC_SQUARE_APPLICATION_ID=sq0idp-D9ddWtjh6LJ4PutoqDhUjg
 NEXT_PUBLIC_SQUARE_LOCATION_ID=LRA1MTWS2VGAM
+
+SQUARE_WEBHOOK_SIGNATURE_KEY=[Square Developer dashboard > Webhooks > Signature key]
+SQUARE_WEBHOOK_NOTIFICATION_URL=https://valleyspecialtyroasters.com/api/webhooks/square
 ```
 
-All of the above are already set in Vercel's project environment.
+All of the above are already set in Vercel's project environment, with the
+exception of the two `SQUARE_WEBHOOK_*` vars — those need to be added when the
+webhook subscription is registered (see "Square webhook setup" below).
 
 ---
 
@@ -177,55 +194,122 @@ Jackie greenlights it (~30 min).
 
 ---
 
-## What's live as of 2026-04-08
+## What's live
 
 ✅ Marketing site at https://valleyspecialtyroasters.com (home, about, wholesale,
-   contact)
+   contact) with the wholesale page pulling Valley's **live coffee catalog**
+   from Square (every SKU, image, variation, price)
 ✅ SSL + custom domain via GoDaddy → Vercel
-✅ Customer registration + login (email/password and magic link)
-✅ Admin dashboard with role-based routing
+✅ Customer registration + login (email/password and magic link), admin
+   approval gate, role-aware routing
+✅ Admin dashboard — overview, orders (with live recurring-order detection
+   from Square), order detail with status + notes, customers (approve, custom
+   pricing, "View as customer" impersonation), products, messages, settings
 ✅ Customer portal showing **real Square order history** for any customer
    linked via `profiles.square_customer_id` (Beanchain is the demo)
-✅ Order detail pages reading from Square
+✅ Order detail pages (Square or Supabase-backed)
+✅ **Portal orders mirror into Square** — every `/portal/reorder` placement
+   creates a Square Order + DRAFT Invoice (admin reviews + sends, or set
+   `app_settings.auto_publish_invoices = true` to auto-publish)
+✅ **Recurring orders use native Square Subscriptions** — Square runs the
+   schedule, no cron on our end; pause/resume/cancel from `/portal/subscriptions`
+✅ **Square webhook receiver** at `/api/webhooks/square` — HMAC-SHA256
+   verified, mirrors invoice + subscription events back into Supabase in real
+   time (payment_status, square_invoice_status, subscription state)
 ✅ Admin contact-message inbox
 ✅ All Next.js 16 / React 19 server-component compatibility issues resolved
-   (cookies adapter, client/server icon serialization, missing "use client"
-   directives on base-ui wrappers)
 
 ---
 
-## What's pending — next development session
+## What's pending — next development sessions
 
-🛠 **Write new orders into Square** — When a customer places an order on
-  `/portal/reorder`, the order should be created in Square so it appears in
-  Top Cup's normal Square dashboard alongside in-store sales.
+🛠 **Simplify admin order status to 4 values** — consolidate the current 6
+  statuses (`pending`, `confirmed`, `roasting`, `shipped`, `delivered`,
+  `cancelled`) into the 4 the client locked in: **Order received**, **In
+  process**, **Shipped**, **Rejected**. No auto-flip to "delivered" — the
+  workflow ends at Shipped. Migration maps old → new; `delivered` stays in
+  the schema for historical rows but is hidden from the admin selector.
 
-🛠 **Square Web Payments SDK** — Embedded credit card widget on the checkout
-  page so customers can pay online. Funds settle into Valley's Square account.
+🛠 **Square-only email notifications (no third-party provider)** — client
+  chose to keep all customer email going through Square so there's nothing
+  extra to maintain. Wiring on status change:
+  - **In process** → publish the Square invoice (currently created as DRAFT).
+    Square auto-emails the invoice to the buyer — that's the "we've started
+    your order, here's how to pay" message.
+  - **Shipped** → updates Supabase `orders.status` only. ⚠️ **No automated
+    email here** — Square has no native "shipped" notification. Either Jackie
+    sends a manual note from the Square Dashboard, or this gap is filled
+    later by adding a small email provider (Resend) just for shipped.
+  - **Rejected** → admin must type a rejection reason; we cancel the Square
+    invoice with the reason added to the invoice memo. Square emails the
+    buyer the cancellation notice automatically.
 
-🛠 **Pull product catalog from Square** — Replace the 8 placeholder coffees
-  in the Supabase `products` table with Valley's real Square catalog so the
-  website always reflects what Valley actually sells, automatically.
+🛠 **`/portal/catalog` browse page** — `fetchCoffeeCatalog` already returns
+  every Square SKU with images + prices; just needs a buyer-facing grid with
+  "Add to order" deep-link into `/portal/reorder`.
 
-🛠 **Per-customer pricing from Square** — Square already holds Valley's custom
-  per-customer wholesale prices. Pull those into the order calculation rather
-  than maintaining them separately in Supabase.
+🛠 **Merge admin-set status into buyer portal view** — for Square-backed
+  customers, the buyer portal currently derives status from Square's order
+  `state` (OPEN/COMPLETED/CANCELED). Admin-set `shipped` / `in_process` on
+  the Supabase row doesn't surface. Fix: left-join Supabase orders by
+  `square_order_id` and overlay our status.
 
-🛠 **Pre-create Supabase accounts for the 14 other wholesalers** — Same
-  pattern as Beanchain. Each gets a login that immediately shows their real
-  order history.
+🛠 **Square Web Payments SDK** — embedded credit card widget on a portal
+  checkout page so customers can pay in-site instead of via the Square-hosted
+  invoice link.
 
-🛠 **Email notifications** — Order confirmation, contact form forwarding,
-  password reset (Supabase Auth handles this; needs sender configured).
+🛠 **Per-customer pricing from Square** — Square already holds Valley's
+  custom per-customer wholesale prices; today we duplicate them in Supabase
+  `customer_pricing`. Move to single-source-of-truth in Square.
 
-🛠 **Real product photography** — Replace Unsplash placeholders with Valley's
+🛠 **Pre-create Supabase accounts for the 14 other wholesalers** — same
+  pattern as Beanchain demo (~30 min batch).
+
+🛠 **Real product photography** — replace Unsplash placeholders with Valley's
   own photos when Jackie sends them.
 
-🛠 **Square account decision** — The handoff doc notes Valley Specialty
-  Roasters LLC is a new legal entity but currently operates as a location
-  under Top Cup's Square merchant account (location `LRA1MTWS2VGAM`). Decide
-  whether Valley should have its own Square merchant account for cleaner
-  accounting and liability separation.
+🛠 **Vercel Analytics** setup.
+
+🛠 **Square account decision** — Valley Specialty Roasters LLC is a new legal
+  entity but currently operates as a location under Top Cup's Square merchant
+  account (location `LRA1MTWS2VGAM`). Decide whether Valley should have its
+  own Square merchant account for cleaner accounting and liability separation.
+
+---
+
+## Square webhook setup (one-time, before going fully live)
+
+The code at `src/app/api/webhooks/square/route.ts` is ready and signature-
+verified, but the webhook subscription itself must be registered in Square.
+
+1. Log in to https://developer.squareup.com/apps with the Valley Square
+   account (`info@valleyspecialtyroasters.com`).
+2. Open the Valley app (`sq0idp-D9ddWtjh6LJ4PutoqDhUjg`) → **Webhooks**
+   (production environment).
+3. Click **Add subscription**.
+   - **Notification URL:** `https://valleyspecialtyroasters.com/api/webhooks/square`
+   - **API version:** `2024-10-17` (matches `SQUARE_VERSION` in the code)
+   - **Events** (subscribe to these):
+     - `invoice.created`
+     - `invoice.published`
+     - `invoice.updated`
+     - `invoice.payment_made`
+     - `invoice.canceled`
+     - `subscription.updated`
+     - `subscription.canceled`
+4. After creating the subscription, copy its **Signature key** and set:
+   - `SQUARE_WEBHOOK_SIGNATURE_KEY` in Vercel project env (Production +
+     Preview)
+   - `SQUARE_WEBHOOK_NOTIFICATION_URL` = `https://valleyspecialtyroasters.com/api/webhooks/square`
+5. Redeploy from Vercel so the new env vars are picked up.
+6. From Square's webhook dashboard, click **Send test event** for
+   `invoice.payment_made` and confirm a 200 response. (Untracked invoice IDs
+   ack with `{ ok: true, ignored: "untracked invoice" }` — that's expected.)
+
+Without this step, Square won't push payment / cancellation / subscription
+events, and the portal will only learn about state changes when a customer
+refreshes (which still works — every Square read is `cache: no-store` —
+but is slower than the webhook-driven update).
 
 ---
 
