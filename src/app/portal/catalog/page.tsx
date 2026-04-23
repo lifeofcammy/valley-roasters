@@ -1,17 +1,16 @@
-import Link from "next/link";
 import Image from "next/image";
 import { getEffectiveProfile } from "@/lib/impersonate";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { RequestPricingButton } from "@/components/portal/RequestPricingButton";
 import {
   fetchCoffeeCatalog,
   fetchCustomerOrders,
   isSquareConfigured,
   type SquareCoffeeItem,
 } from "@/lib/square/client";
-import { Coffee, Plus, Sparkles } from "lucide-react";
+import { Coffee, Sparkles } from "lucide-react";
 
 /**
  * Wholesale buyer catalog — every coffee SKU Valley currently sells,
@@ -117,9 +116,11 @@ export default async function CatalogPage() {
           Coffee Catalog
         </h1>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-          Every coffee we&apos;re currently roasting. Items you haven&apos;t
-          ordered before are up top — click <strong>Add to order</strong> to
-          drop one into a new cart.
+          Every coffee we&apos;re currently roasting. Valley quotes wholesale
+          pricing per-customer, so prices aren&apos;t shown here — click{" "}
+          <strong>Request pricing</strong> on anything that catches your eye
+          and we&apos;ll follow up with a custom quote. Items you haven&apos;t
+          ordered before are surfaced first.
         </p>
       </div>
 
@@ -132,8 +133,6 @@ export default async function CatalogPage() {
           {sorted.map((item) => {
             const orderedBefore = isOrderedBefore(item);
             const highlighted = highlightIds.has(item.id);
-            const firstVar = item.variations[0];
-            const priceCents = firstVar?.price_cents ?? 0;
             return (
               <Card
                 key={item.id}
@@ -182,37 +181,34 @@ export default async function CatalogPage() {
                       {item.description}
                     </p>
                   )}
-                  <div className="flex items-end justify-between mt-auto pt-3">
-                    <div>
-                      {priceCents > 0 ? (
-                        <p className="font-bold text-lg">
-                          ${(priceCents / 100).toFixed(2)}
-                          {firstVar?.name && (
-                            <span className="text-xs font-normal text-muted-foreground ml-1">
-                              / {firstVar.name}
-                            </span>
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Contact for price
+                  <div className="flex items-end justify-between mt-auto pt-3 gap-3">
+                    <div className="text-xs text-muted-foreground min-w-0">
+                      {item.variations.length > 0 && (
+                        <p className="truncate">
+                          {item.variations
+                            .map((v) => v.name || "Default")
+                            .filter(Boolean)
+                            .join(" · ")}
                         </p>
                       )}
-                      {item.variations.length > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                          +{item.variations.length - 1} more size
-                          {item.variations.length - 1 > 1 ? "s" : ""}
+                      {orderedBefore && (
+                        <p className="mt-1 italic">
+                          Reorder at your agreed price from{" "}
+                          <span className="font-medium">Orders</span>.
                         </p>
                       )}
                     </div>
-                    <Link
-                      href={`/portal/reorder?sku=${encodeURIComponent(item.id)}`}
-                    >
-                      <Button size="sm">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add to order
-                      </Button>
-                    </Link>
+                    <RequestPricingButton
+                      productId={item.id}
+                      productName={item.name}
+                      variations={item.variations.map((v) => ({
+                        id: v.id,
+                        name: v.name,
+                      }))}
+                      buyerName={profile?.full_name ?? null}
+                      buyerEmail={profile?.email ?? null}
+                      buyerCompany={profile?.company_name ?? null}
+                    />
                   </div>
                 </CardContent>
               </Card>

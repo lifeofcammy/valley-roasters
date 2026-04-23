@@ -144,10 +144,15 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
 
   const recurring: RecurringOrder[] = [];
 
-  // (a) Formal Square Subscriptions (active + paused)
+  // (a) Formal Square Subscriptions (active + paused).
+  // PENDING subs with zero amount and no generated invoices are almost
+  // always orphans from earlier development testing or from Square's
+  // "subscription created but pending cancel" state — hide them rather
+  // than surface $0.00/UNKNOWN rows to admins.
   for (const sub of squareSubs) {
     const st = sub.status.toUpperCase();
     if (st !== "ACTIVE" && st !== "PAUSED" && st !== "PENDING") continue;
+    if (st === "PENDING" && sub.amount_cents === 0) continue;
     recurring.push({
       id: sub.id,
       customer_name: nameMap.get(sub.customer_id) ?? "Unknown",
