@@ -103,14 +103,15 @@ export default function TenThingsStaffTrainingPage() {
           </p>
 
           <h2 className="font-display text-2xl sm:text-3xl font-bold text-foreground pt-8">
-            4. Milk steaming that isn't decorative
+            4. Milk steaming fundamentals
           </h2>
           <p>
-            Great latte art is downstream of proper microfoam. Train the
-            fundamentals of steam wand positioning, whirlpool formation,
-            and aeration timing before anyone tries to pour a rosetta.
-            A perfectly poured tulip on top of thin, flat milk is still
-            a bad latte.
+            Proper microfoam is the foundation of every milk drink. Train
+            the fundamentals of steam wand positioning, whirlpool formation,
+            and aeration timing so every pour lands with the same silky
+            texture. Thin, flat milk makes even the best espresso taste
+            flat — get this right and every latte, cappuccino, and flat
+            white levels up.
           </p>
           <p>
             Teach texture by touch. Steam pitcher surface temperature is

@@ -241,7 +241,7 @@ All photos currently on the site are **Unsplash stock photos** (free, licensed f
   - [ ] Team photos
   - [ ] Product / coffee bag photos
   - [ ] Roasting process photos
-  - [ ] Latte art / beverage photos
+  - [ ] Beverage photos
   - [ ] Partner cafe photos
 
 When the photos are ready, send them to Cam and he'll swap them in.

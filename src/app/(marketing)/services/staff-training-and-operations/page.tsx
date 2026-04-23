@@ -174,10 +174,6 @@ export default function StaffTrainingAndOperationsPage() {
                 a: "Your lead barista, who we train to train others, onboards them using the recipe cards and SOPs we leave behind. If you'd rather have us do it, we offer refresher training visits at an additional cost.",
               },
               {
-                q: "Can you train on latte art?",
-                a: "Yes, if your team's fundamentals are solid. We start with clean extraction and proper microfoam. Latte art comes once the basics are reliable — otherwise you're decorating a mediocre drink.",
-              },
-              {
                 q: "Do you help if my shop is already open?",
                 a: "Often yes — many partners come to us after they've been open a few months and quality is drifting. We audit current technique and retrain on whatever's slipping.",
               },
