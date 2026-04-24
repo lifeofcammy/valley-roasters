@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
-import { Package, DollarSign, Users, Clock, ExternalLink } from "lucide-react";
+import { Package, Users, Clock, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import {
@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
   const supabase = await createClient();
 
   // Fetch stats
-  const [ordersRes, customersRes, pendingRes, revenueRes, recentOrdersRes] =
+  const [ordersRes, customersRes, pendingRes, recentOrdersRes] =
     await Promise.all([
       supabase.from("orders").select("id", { count: "exact", head: true }),
       supabase
@@ -30,17 +30,10 @@ export default async function AdminDashboardPage() {
         .in("status", ["received", "pending", "confirmed"]),
       supabase
         .from("orders")
-        .select("total_cents")
-        .eq("payment_status", "paid"),
-      supabase
-        .from("orders")
         .select("*, profiles(company_name)")
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
-
-  const totalRevenue =
-    revenueRes.data?.reduce((sum, o) => sum + o.total_cents, 0) ?? 0;
 
   // Also pull Square-native invoices so the "Recent Orders" widget
   // reflects orders Jackie created directly in Square (not via portal).
@@ -128,11 +121,6 @@ export default async function AdminDashboardPage() {
       icon: Package,
     },
     {
-      label: "Revenue",
-      value: `$${(totalRevenue / 100).toFixed(2)}`,
-      icon: DollarSign,
-    },
-    {
       label: "Active Customers",
       value: customersRes.count ?? 0,
       icon: Users,
@@ -151,7 +139,7 @@ export default async function AdminDashboardPage() {
       </h1>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 sm:mb-8">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4 sm:p-6">
