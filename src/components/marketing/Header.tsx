@@ -35,7 +35,7 @@ export function Header() {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden lg:flex items-center gap-8">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -54,7 +54,7 @@ export function Header() {
 
           {/* Mobile toggle */}
           <button
-            className="md:hidden p-2"
+            className="lg:hidden p-2"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
           >
@@ -64,7 +64,7 @@ export function Header() {
 
         {/* Mobile nav */}
         {mobileOpen && (
-          <div className="md:hidden pb-4 space-y-1 border-t border-border pt-4">
+          <div className="lg:hidden pb-4 space-y-1 border-t border-border pt-4">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
