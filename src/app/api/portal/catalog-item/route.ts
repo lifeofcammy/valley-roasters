@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  fetchCoffeeCatalog,
+  fetchValleyCatalog,
   isSquareConfigured,
 } from "@/lib/square/client";
 
 /**
  * Returns a single Square catalog item by its id — used by the reorder
  * page to resolve the ?sku=<id> deep-link from /portal/catalog into a
- * cart pre-fill. We re-use `fetchCoffeeCatalog` rather than a single-item
+ * cart pre-fill. We re-use `fetchValleyCatalog` rather than a single-item
  * fetch because the catalog call is already cached for 1 hour (`valley-
  * catalog` tag) so this is effectively free.
  *
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const items = await fetchCoffeeCatalog();
+    const items = await fetchValleyCatalog();
     const item = items.find((i) => i.id === id);
     if (!item) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

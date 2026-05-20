@@ -293,6 +293,15 @@ export type SquareCoffeeItem = {
   variations: SquareCoffeeVariation[];
 };
 
+/**
+ * Any catalog item enabled at Valley's Square location — coffee,
+ * pastries, food, etc. Superset of `SquareCoffeeItem` with the
+ * Square "reporting category" name attached for portal filtering.
+ */
+export type SquareCatalogItem = SquareCoffeeItem & {
+  category: string | null;
+};
+
 // Keyword list for the catalog filter — broader than the top-sellers
 // filter because here we want to surface ALL coffee SKUs even if their
 // names don't include "bean" or "roast" explicitly.
@@ -314,6 +323,7 @@ type SquareCatalogObject = {
     description?: string;
     description_plaintext?: string;
     image_ids?: string[];
+    reporting_category?: { id?: string };
     variations?: Array<{
       id: string;
       type: string;
@@ -324,6 +334,9 @@ type SquareCatalogObject = {
       };
     }>;
   };
+  category_data?: {
+    name?: string;
+  };
   image_data?: {
     url?: string;
     name?: string;
@@ -331,8 +344,10 @@ type SquareCatalogObject = {
 };
 
 /**
- * Fetch all coffee items from Valley's Square catalog. Filters to
- * coffee SKUs by name keyword and skips Top Cup internal items.
+ * Fetch every catalog item enabled at Valley's Square location —
+ * coffee, pastries, food, etc. Skips Top Cup internal ("TC ___")
+ * SKUs. Each item carries its Square "reporting category" name so
+ * the portal catalog can offer category filtering.
  *
  * Cached for 1 hour with the `valley-catalog` tag — call
  * `revalidateTag('valley-catalog')` to bust early when needed.
@@ -342,7 +357,7 @@ type SquareCatalogObject = {
  * (single round trip). Items without an image return null and the
  * caller should fall back to a placeholder.
  */
-export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
+export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
   const { locationId } = getConfig();
 
   // 1. Search the catalog for ITEMs that are enabled at our location.
@@ -369,20 +384,44 @@ export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
     cursor = data.cursor;
   } while (cursor);
 
-  // 2. Filter to coffee items.
-  const coffeeItems = allItems.filter((obj) => {
+  // 2. Keep live ITEMs with a name; drop Top Cup internal SKUs.
+  const items = allItems.filter((obj) => {
     if (obj.type !== "ITEM") return false;
     if (obj.is_deleted) return false;
     const name = obj.item_data?.name ?? "";
     if (!name) return false;
     if (isTopCupInternal(name)) return false;
-    return COFFEE_CATALOG_KEYWORDS.test(name);
+    return true;
   });
 
-  // 3. Collect unique image ids and batch-fetch their URLs in one call.
+  // 3. Resolve reporting-category ids to names (best-effort).
+  const categoryNameById = new Map<string, string>();
+  try {
+    let catCursor: string | undefined;
+    do {
+      const qs = catCursor
+        ? `?types=CATEGORY&cursor=${encodeURIComponent(catCursor)}`
+        : "?types=CATEGORY";
+      const data = await squareFetch<{
+        objects?: SquareCatalogObject[];
+        cursor?: string;
+      }>(`/v2/catalog/list${qs}`, {
+        next: { revalidate: 3600, tags: ["valley-catalog"] },
+      });
+      for (const obj of data.objects ?? []) {
+        const nm = obj.category_data?.name;
+        if (obj.id && nm) categoryNameById.set(obj.id, nm);
+      }
+      catCursor = data.cursor;
+    } while (catCursor);
+  } catch {
+    // Category names are best-effort; items just show as uncategorized.
+  }
+
+  // 4. Collect unique image ids and batch-fetch their URLs in one call.
   const imageIds = new Map<string, string>(); // first image id per item
   const allImageIds = new Set<string>();
-  for (const obj of coffeeItems) {
+  for (const obj of items) {
     const ids = obj.item_data?.image_ids ?? [];
     if (ids.length > 0) {
       imageIds.set(obj.id, ids[0]);
@@ -411,12 +450,12 @@ export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
       }
     } catch {
       // Image fetches are best-effort; missing images fall back to
-      // the placeholder list on the wholesale page.
+      // a placeholder in the UI.
     }
   }
 
-  // 4. Shape into the public type.
-  return coffeeItems.map<SquareCoffeeItem>((obj) => {
+  // 5. Shape into the public type.
+  return items.map<SquareCatalogItem>((obj) => {
     const variations = (obj.item_data?.variations ?? []).map((v) => ({
       id: v.id,
       name: v.item_variation_data?.name ?? "",
@@ -428,6 +467,9 @@ export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
       ? imageUrlById.get(firstImageId) ?? null
       : null;
 
+    const catId = obj.item_data?.reporting_category?.id;
+    const category = catId ? categoryNameById.get(catId) ?? null : null;
+
     return {
       id: obj.id,
       name: obj.item_data?.name ?? "",
@@ -436,9 +478,20 @@ export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
         obj.item_data?.description ??
         null,
       primary_image_url,
+      category,
       variations,
     };
   });
+}
+
+/**
+ * Coffee-only slice of the Valley catalog — used by the public
+ * wholesale marketing page and admin products view. Filters
+ * `fetchValleyCatalog()` down to coffee SKUs by name keyword.
+ */
+export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
+  const all = await fetchValleyCatalog();
+  return all.filter((item) => COFFEE_CATALOG_KEYWORDS.test(item.name));
 }
 
 /* ------------------------------------------------------------- */
