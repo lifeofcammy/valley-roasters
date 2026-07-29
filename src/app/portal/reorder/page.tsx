@@ -14,7 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, ShoppingCart, Loader2, Repeat, Truck } from "lucide-react";
+import {
+  Trash2,
+  ShoppingCart,
+  Loader2,
+  Repeat,
+  Truck,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   calculateDeliveryFeeCents,
@@ -41,6 +48,22 @@ interface CartItem {
 
 type Frequency = "weekly" | "biweekly" | "monthly";
 
+interface OutstandingInvoice {
+  id: string;
+  invoice_number: string | null;
+  amount_cents: number;
+  due_date: string | null;
+  public_url: string | null;
+  is_overdue: boolean;
+}
+
+interface OrderHoldState {
+  blocked: boolean;
+  message: string;
+  invoices: OutstandingInvoice[];
+  total_cents: number;
+}
+
 export default function ReorderPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -63,6 +86,8 @@ export default function ReorderPage() {
 
   const [makeRecurring, setMakeRecurring] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>("biweekly");
+  // Credit hold — set when the buyer has an outstanding Square invoice.
+  const [hold, setHold] = useState<OrderHoldState | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -76,6 +101,17 @@ export default function ReorderPage() {
         .select("*")
         .eq("is_active", true)
         .order("sort_order");
+
+      // Credit hold check — surfaces an outstanding invoice before the
+      // buyer bothers building a cart. Advisory; /api/orders re-checks.
+      fetch("/api/portal/order-hold", { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((h: OrderHoldState | null) => {
+          if (h) setHold(h);
+        })
+        .catch(() => {
+          // Non-fatal — checkout still enforces the hold server-side.
+        });
 
       const { data: pricing } = await supabase
         .from("customer_pricing")
@@ -194,6 +230,10 @@ export default function ReorderPage() {
       toast.error("Add items to your cart first.");
       return;
     }
+    if (hold?.blocked) {
+      toast.error(hold.message);
+      return;
+    }
 
     setPlacing(true);
     try {
@@ -240,6 +280,17 @@ export default function ReorderPage() {
           );
         }
       } else {
+        // A hold can appear between page load and checkout (e.g. Jackie
+        // sends an invoice while the buyer is building a cart). Surface it
+        // in the banner rather than only as a toast.
+        if (data.code === "OUTSTANDING_INVOICE") {
+          setHold({
+            blocked: true,
+            message: data.error,
+            invoices: data.invoices ?? [],
+            total_cents: data.total_cents ?? 0,
+          });
+        }
         toast.error(data.error || "Could not place order. Please try again.");
         setPlacing(false);
       }
@@ -269,6 +320,62 @@ export default function ReorderPage() {
             : "Select products and quantities to place an order."}
         </p>
       </div>
+
+      {hold?.blocked && (
+        <div className="mb-6 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-700 dark:text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-amber-900 dark:text-amber-100">
+                Ordering paused — balance due
+              </h2>
+              <p className="text-sm text-amber-900/90 dark:text-amber-200/90 mt-1">
+                {hold.message}
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {hold.invoices.map((inv) => (
+                  <li
+                    key={inv.id}
+                    className="text-sm flex flex-wrap items-center gap-x-2 gap-y-1"
+                  >
+                    <span className="font-medium text-amber-900 dark:text-amber-100">
+                      Invoice {inv.invoice_number ?? inv.id.slice(0, 8)}
+                    </span>
+                    <span className="text-amber-900/80 dark:text-amber-200/80">
+                      ${(inv.amount_cents / 100).toFixed(2)}
+                    </span>
+                    {inv.due_date && (
+                      <span
+                        className={
+                          inv.is_overdue
+                            ? "text-red-700 dark:text-red-400 font-medium"
+                            : "text-amber-900/70 dark:text-amber-200/70"
+                        }
+                      >
+                        {inv.is_overdue ? "past due" : "due"} {inv.due_date}
+                      </span>
+                    )}
+                    {inv.public_url && (
+                      <a
+                        href={inv.public_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium text-amber-900 dark:text-amber-100 hover:no-underline"
+                      >
+                        Pay now →
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-900/70 dark:text-amber-200/70 mt-3">
+                Already paid? Payments can take a few minutes to post — refresh
+                this page, or contact us and we&apos;ll sort it out.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
@@ -477,7 +584,12 @@ export default function ReorderPage() {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={cart.length === 0 || placing || isImpersonating}
+                disabled={
+                  cart.length === 0 ||
+                  placing ||
+                  isImpersonating ||
+                  Boolean(hold?.blocked)
+                }
                 onClick={handlePlaceOrder}
               >
                 {placing ? (
@@ -485,12 +597,19 @@ export default function ReorderPage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Placing...
                   </>
+                ) : hold?.blocked ? (
+                  "Balance due"
                 ) : makeRecurring ? (
                   "Place Order & Schedule"
                 ) : (
                   "Place Order"
                 )}
               </Button>
+              {hold?.blocked && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 text-center">
+                  Settle your outstanding invoice to place a new order
+                </p>
+              )}
               {isImpersonating && (
                 <p className="text-xs text-muted-foreground text-center">
                   Disabled in admin preview mode

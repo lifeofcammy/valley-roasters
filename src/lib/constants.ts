@@ -100,3 +100,18 @@ export function calculateDeliveryFeeCents(subtotalCents: number): number {
     ? DELIVERY_FEE_CENTS
     : 0;
 }
+
+/**
+ * Credit hold policy — a buyer can't place a new order while they have
+ * an outstanding Square invoice.
+ *
+ * - `"unpaid"`  (client's stated rule) any sent-but-unpaid invoice blocks,
+ *                even if it isn't due yet.
+ * - `"overdue"` only invoices past their due date block, so NET-30 buyers
+ *                can keep ordering inside their terms.
+ *
+ * Flip this one value to change the rule everywhere — the orders API and
+ * the portal banner both read it. Draft, scheduled, paid, canceled and
+ * refunded invoices never block.
+ */
+export const ORDER_BLOCK_POLICY: "unpaid" | "overdue" = "unpaid";

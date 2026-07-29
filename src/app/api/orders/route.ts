@@ -14,6 +14,7 @@ import {
   calculateDeliveryFeeCents,
   DELIVERY_FEE_LABEL,
 } from "@/lib/constants";
+import { getOrderHold, orderHoldMessage } from "@/lib/order-hold";
 
 /* ------------------------------------------------------------- */
 /* Zod schema — runtime-validates every field before any write.   */
@@ -179,6 +180,24 @@ export async function POST(request: Request) {
         square_invoice_public_url: existing.square_invoice_public_url,
         deduped: true,
       });
+    }
+
+    // Credit hold — refuse new orders while this buyer has an outstanding
+    // Square invoice. Checked after the idempotency lookup so retrying an
+    // order that already went through still returns that order instead of
+    // being rejected. The portal hides the Place Order button too, but this
+    // is the check that actually enforces it.
+    const hold = await getOrderHold(profile.square_customer_id);
+    if (hold.blocked) {
+      return NextResponse.json(
+        {
+          error: orderHoldMessage(hold),
+          code: "OUTSTANDING_INVOICE",
+          invoices: hold.invoices,
+          total_cents: hold.total_cents,
+        },
+        { status: 409 }
+      );
     }
 
     // Validate Supabase-product prices server-side via RPC.

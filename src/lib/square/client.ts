@@ -1096,6 +1096,95 @@ export async function fetchSquareInvoices(opts?: {
 }
 
 /* ------------------------------------------------------------- */
+/* OUTSTANDING INVOICES — credit hold before placing a new order  */
+/* ------------------------------------------------------------- */
+
+/**
+ * Square invoice states that count as "money still owed".
+ *
+ * Deliberately excludes DRAFT (our own portal orders start as drafts —
+ * counting them would block a buyer the moment they placed one order),
+ * SCHEDULED (a future recurring invoice that hasn't been sent yet), and
+ * every settled state (PAID / CANCELED / REFUNDED / PARTIALLY_REFUNDED).
+ */
+const OUTSTANDING_INVOICE_STATUSES = new Set(["UNPAID", "PARTIALLY_PAID"]);
+
+export type OutstandingInvoice = {
+  id: string;
+  invoice_number: string | null;
+  amount_cents: number;
+  due_date: string | null;
+  public_url: string | null;
+  /** True when `due_date` is strictly before today in Phoenix time. */
+  is_overdue: boolean;
+};
+
+/** Today in Phoenix (America/Phoenix has no DST) as YYYY-MM-DD. */
+function phoenixToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Phoenix",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Invoices this customer still owes money on, newest first.
+ *
+ * Always reads fresh from Square (`cache: no-store`) — this gates order
+ * placement, so a stale cache could either wrongly block a buyer who just
+ * paid or wrongly admit one who hasn't.
+ */
+export async function fetchOutstandingInvoices(
+  squareCustomerId: string
+): Promise<OutstandingInvoice[]> {
+  const { locationId } = getConfig();
+
+  const data = await squareFetch<{
+    invoices?: Array<{
+      id: string;
+      invoice_number?: string;
+      status?: string;
+      payment_requests?: Array<{
+        computed_amount_money?: SquareMoney;
+        due_date?: string;
+      }>;
+      public_url?: string;
+    }>;
+  }>("/v2/invoices/search", {
+    method: "POST",
+    body: JSON.stringify({
+      query: {
+        filter: {
+          location_ids: [locationId],
+          customer_ids: [squareCustomerId],
+        },
+        sort: { field: "INVOICE_SORT_DATE", order: "DESC" },
+      },
+      limit: 200,
+    }),
+  });
+
+  const today = phoenixToday();
+
+  return (data.invoices ?? [])
+    .filter((inv) => OUTSTANDING_INVOICE_STATUSES.has(inv.status ?? ""))
+    .map((inv) => {
+      const pr = inv.payment_requests?.[0];
+      const due = pr?.due_date ?? null;
+      return {
+        id: inv.id,
+        invoice_number: inv.invoice_number ?? null,
+        amount_cents: pr?.computed_amount_money?.amount ?? 0,
+        due_date: due,
+        public_url: inv.public_url ?? null,
+        is_overdue: Boolean(due && due < today),
+      };
+    });
+}
+
+/* ------------------------------------------------------------- */
 /* Invoice state transitions — publish (send) + cancel           */
 /* ------------------------------------------------------------- */
 
