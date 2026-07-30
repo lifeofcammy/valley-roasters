@@ -8,6 +8,7 @@ import {
 } from "@/lib/square/client";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
+import { SITE_URL } from "@/lib/constants";
 
 export type AddCustomerState = {
   success: boolean;
@@ -74,21 +75,23 @@ export async function addCustomerAction(
     }
   }
 
-  // 2. Create Supabase auth user with a generated temporary password
-  const tempPassword = `Valley-${randomUUID().slice(0, 12)}!`;
+  // 2. Create the auth user by INVITING them — Supabase emails a signup
+  //    link and the buyer sets their own password on /welcome. (This used
+  //    to createUser() with a random temp password that was thrown away,
+  //    so the customer had no way to ever sign in.)
   const { data: authUser, error: authError } =
-    await admin.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true, // Skip email confirmation for admin-created accounts
+    await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${SITE_URL}/auth/callback?next=/welcome`,
+      data: { company_name: companyName, full_name: contactName },
     });
 
   if (authError || !authUser?.user) {
-    console.error("Failed to create auth user:", authError);
+    console.error("Failed to invite user:", authError);
     return {
       success: false,
       error:
-        authError?.message ?? "Failed to create user account. The email may already be in use.",
+        authError?.message ??
+        "Could not send the invite. The email may already have an account.",
     };
   }
 
@@ -116,5 +119,55 @@ export async function addCustomerAction(
   }
 
   revalidatePath("/admin/customers");
+  return { success: true, error: null };
+}
+
+/**
+ * Email an existing customer a fresh link to set their password.
+ *
+ * Covers three cases:
+ *  - the original invite expired or was deleted
+ *  - an account created before invites existed (those got a random
+ *    temporary password that was never shown to anyone)
+ *  - the buyer simply forgot their password and asks Valley directly
+ *
+ * Uses a recovery link rather than a second invite, because Supabase
+ * rejects inviting an email that already has an account.
+ */
+export async function resendInviteAction(
+  _prev: AddCustomerState,
+  formData: FormData
+): Promise<AddCustomerState> {
+  const supabase = await createClient();
+  const {
+    data: { user: actor },
+  } = await supabase.auth.getUser();
+  if (!actor) return { success: false, error: "Not authenticated" };
+
+  const { data: actorProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", actor.id)
+    .maybeSingle();
+  if (actorProfile?.role !== "admin")
+    return { success: false, error: "Forbidden" };
+
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
+  if (!email) return { success: false, error: "Email is required." };
+
+  // resetPasswordForEmail sends the mail; the link lands on /auth/callback
+  // which exchanges the code and drops them on /welcome to pick a password.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${SITE_URL}/auth/callback?next=/welcome`,
+  });
+
+  if (error) {
+    console.error("Failed to resend invite:", error);
+    return {
+      success: false,
+      error: error.message ?? "Could not send the email. Please try again.",
+    };
+  }
+
   return { success: true, error: null };
 }

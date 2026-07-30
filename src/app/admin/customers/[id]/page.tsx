@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft, Eye } from "lucide-react";
+import { ResendInviteButton } from "./resend-invite-button";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -112,6 +113,7 @@ export default async function AdminCustomerDetailPage({
             </a>
           </p>
         </div>
+        <ResendInviteButton email={customer.email ?? ""} />
         <form action="/api/admin/impersonate" method="POST" className="flex-shrink-0">
           <input type="hidden" name="targetCustomerId" value={customer.id} />
           <Button

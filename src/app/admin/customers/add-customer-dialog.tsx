@@ -44,10 +44,10 @@ export function AddCustomerDialog() {
       />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Customer</DialogTitle>
+          <DialogTitle>Invite New Customer</DialogTitle>
           <DialogDescription>
-            Creates a Square customer, a portal login, and marks the account as
-            approved.
+            Creates a Square customer and an approved portal account, then
+            emails them an invite to choose their own password.
           </DialogDescription>
         </DialogHeader>
 
