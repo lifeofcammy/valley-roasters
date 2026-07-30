@@ -293,14 +293,43 @@ export type SquareCoffeeItem = {
   variations: SquareCoffeeVariation[];
 };
 
+/** One selectable grind (Square modifier option). */
+export type SquareGrindOption = {
+  id: string;
+  name: string;
+  price_cents: number;
+};
+
 /**
  * Any catalog item enabled at Valley's Square location — coffee,
- * pastries, food, etc. Superset of `SquareCoffeeItem` with the
- * Square "reporting category" name attached for portal filtering.
+ * pastries, food, etc. Superset of `SquareCoffeeItem` with the Square
+ * "reporting category" attached (name for display, id for per-account
+ * filtering) plus any grind choices Square has on the item.
  */
 export type SquareCatalogItem = SquareCoffeeItem & {
   category: string | null;
+  category_id: string | null;
+  /** Grind choices, or [] when the item isn't ground to order. */
+  grind_options: SquareGrindOption[];
 };
+
+/**
+ * Square MODIFIER_LIST ids that represent "how should we grind this".
+ *
+ * Valley has two, both attached to coffee items:
+ *   4CPHINB3M6654IFDBOP4EFDO  "Ground Type"  Whole Bean / Cold Brew /
+ *                                            Drip / Espresso / Turkish
+ *   UHVX2QSYQYMVKFEAEFT5NE5I  "Options"      Whole Bean / Fine / Medium /
+ *                                            Coarse / Extra Coarse
+ *
+ * Listed explicitly rather than name-matched so an unrelated list named
+ * "Options" can never turn into a grind picker. Add an id here if Valley
+ * creates another grind list.
+ */
+const GRIND_MODIFIER_LIST_IDS = new Set([
+  "4CPHINB3M6654IFDBOP4EFDO",
+  "UHVX2QSYQYMVKFEAEFT5NE5I",
+]);
 
 // Keyword list for the catalog filter — broader than the top-sellers
 // filter because here we want to surface ALL coffee SKUs even if their
@@ -324,6 +353,10 @@ type SquareCatalogObject = {
     description_plaintext?: string;
     image_ids?: string[];
     reporting_category?: { id?: string };
+    modifier_list_info?: Array<{
+      modifier_list_id?: string;
+      enabled?: boolean;
+    }>;
     variations?: Array<{
       id: string;
       type: string;
@@ -336,6 +369,16 @@ type SquareCatalogObject = {
   };
   category_data?: {
     name?: string;
+  };
+  modifier_list_data?: {
+    name?: string;
+    modifiers?: Array<{
+      id: string;
+      modifier_data?: {
+        name?: string;
+        price_money?: { amount?: number };
+      };
+    }>;
   };
   image_data?: {
     url?: string;
@@ -418,6 +461,35 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
     // Category names are best-effort; items just show as uncategorized.
   }
 
+  // 3b. Load the grind modifier lists so items can offer grind choices.
+  const grindOptionsByListId = new Map<string, SquareGrindOption[]>();
+  try {
+    const data = await squareFetch<{ objects?: SquareCatalogObject[] }>(
+      "/v2/catalog/batch-retrieve",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          object_ids: Array.from(GRIND_MODIFIER_LIST_IDS),
+          include_related_objects: false,
+        }),
+        next: { revalidate: 3600, tags: ["valley-catalog"] },
+      }
+    );
+    for (const obj of data.objects ?? []) {
+      if (obj.type !== "MODIFIER_LIST") continue;
+      const options = (obj.modifier_list_data?.modifiers ?? [])
+        .map((m) => ({
+          id: m.id,
+          name: m.modifier_data?.name ?? "",
+          price_cents: m.modifier_data?.price_money?.amount ?? 0,
+        }))
+        .filter((o) => o.name);
+      if (options.length) grindOptionsByListId.set(obj.id, options);
+    }
+  } catch {
+    // Best-effort — without this, coffee just won't offer a grind picker.
+  }
+
   // 4. Collect unique image ids and batch-fetch their URLs in one call.
   const imageIds = new Map<string, string>(); // first image id per item
   const allImageIds = new Set<string>();
@@ -467,8 +539,18 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
       ? imageUrlById.get(firstImageId) ?? null
       : null;
 
-    const catId = obj.item_data?.reporting_category?.id;
+    const catId = obj.item_data?.reporting_category?.id ?? null;
     const category = catId ? categoryNameById.get(catId) ?? null : null;
+
+    // Grind choices come from whichever grind modifier list Square has
+    // attached to this item (at most one in practice).
+    const grind_options: SquareGrindOption[] = [];
+    for (const info of obj.item_data?.modifier_list_info ?? []) {
+      const listId = info.modifier_list_id;
+      if (!listId || info.enabled === false) continue;
+      const opts = grindOptionsByListId.get(listId);
+      if (opts) grind_options.push(...opts);
+    }
 
     return {
       id: obj.id,
@@ -479,6 +561,8 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
         null,
       primary_image_url,
       category,
+      category_id: catId,
+      grind_options,
       variations,
     };
   });

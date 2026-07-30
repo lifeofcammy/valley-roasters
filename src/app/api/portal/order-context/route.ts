@@ -2,18 +2,21 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveProfile } from "@/lib/impersonate";
 import { getOrderHold, orderHoldMessage } from "@/lib/order-hold";
+import { alwaysChargesDelivery } from "@/lib/account-pricing";
 
 /**
- * Whether the signed-in buyer currently has a credit hold (an outstanding
- * Square invoice). The reorder page calls this on load so it can show the
- * hold up front rather than letting someone build a cart and get rejected
- * at checkout.
+ * Everything the reorder cart needs to know about *this* buyer before
+ * they check out:
  *
- * Advisory only — `/api/orders` re-checks server-side before writing
- * anything, so a stale or spoofed response here can't place an order.
+ *  - `hold`     whether an outstanding Square invoice blocks new orders
+ *  - `delivery` whether the flat fee applies regardless of subtotal
+ *
+ * Advisory only — `/api/orders` recomputes both server-side before
+ * writing anything, so a stale or spoofed response here can't place an
+ * order or dodge a delivery fee.
  *
  * Uses the *effective* profile so an admin previewing as a customer sees
- * that customer's hold state.
+ * that customer's rules.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -32,9 +35,14 @@ export async function GET() {
   const hold = await getOrderHold(profile.square_customer_id);
 
   return NextResponse.json({
-    blocked: hold.blocked,
-    message: orderHoldMessage(hold),
-    invoices: hold.invoices,
-    total_cents: hold.total_cents,
+    hold: {
+      blocked: hold.blocked,
+      message: orderHoldMessage(hold),
+      invoices: hold.invoices,
+      total_cents: hold.total_cents,
+    },
+    delivery: {
+      alwaysCharge: alwaysChargesDelivery(profile.square_customer_id),
+    },
   });
 }

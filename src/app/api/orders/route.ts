@@ -9,12 +9,14 @@ import {
   createSquareSubscription,
   createSquareSubscriptionPlan,
   isSquareConfigured,
+  type CreateOrderLineItem,
 } from "@/lib/square/client";
 import {
   calculateDeliveryFeeCents,
   DELIVERY_FEE_LABEL,
 } from "@/lib/constants";
 import { getOrderHold, orderHoldMessage } from "@/lib/order-hold";
+import { alwaysChargesDelivery } from "@/lib/account-pricing";
 
 /* ------------------------------------------------------------- */
 /* Zod schema — runtime-validates every field before any write.   */
@@ -26,6 +28,16 @@ const cartItemSchema = z.object({
   size: z.string().min(1).max(50),
   quantity: z.number().int().positive().max(10000),
   unit_price_cents: z.number().int().nonnegative().max(1_000_000),
+  // Chosen grind (a Square modifier option). Display-only — it rides
+  // along to Square on the line-item note so the roastery knows how to
+  // grind, and never affects price.
+  grind: z
+    .object({
+      id: z.string().max(64),
+      name: z.string().max(80),
+    })
+    .nullable()
+    .optional(),
 });
 
 const recurringSchema = z
@@ -226,9 +238,12 @@ export async function POST(request: Request) {
       0
     );
 
-    // Delivery fee: $5 flat on orders below $300. Jackie previously added
-    // this manually to Square invoices; it's now automatic.
-    const deliveryFeeCents = calculateDeliveryFeeCents(subtotalCents);
+    // Delivery fee: $5 flat on orders below $300, or on every order for
+    // distant accounts (Sahara, Shaghf Glendale). Computed server-side so
+    // the client can't opt out of it.
+    const deliveryFeeCents = calculateDeliveryFeeCents(subtotalCents, {
+      alwaysCharge: alwaysChargesDelivery(profile.square_customer_id),
+    });
     const totalCents = subtotalCents + deliveryFeeCents;
 
     // 1. Save order in Supabase. The delivery fee rolls into total_cents;
@@ -322,11 +337,18 @@ export async function POST(request: Request) {
         // Assemble Square line items. Append a "Delivery" line only when
         // the fee applies — orders at/over the free-shipping threshold
         // don't see it at all.
-        const squareLineItems = validatedItems.map((it) => ({
-          name: it.product_name,
-          quantity: it.quantity,
-          unit_price_cents: it.unit_price_cents,
-        }));
+        // The chosen grind rides along as a line-item note so the roastery
+        // sees it on the Square order and invoice. Sent as a note rather
+        // than a Square modifier because these are ad-hoc line items, not
+        // catalog-linked ones.
+        const squareLineItems: CreateOrderLineItem[] = validatedItems.map(
+          (it) => ({
+            name: it.product_name,
+            quantity: it.quantity,
+            unit_price_cents: it.unit_price_cents,
+            ...(it.grind?.name ? { note: `Grind: ${it.grind.name}` } : {}),
+          })
+        );
         if (deliveryFeeCents > 0) {
           squareLineItems.push({
             name: DELIVERY_FEE_LABEL,

@@ -16,6 +16,8 @@ export interface CatalogItemView {
   primary_image_url: string | null;
   category: string | null;
   variations: { id: string; name: string; price_cents: number }[];
+  /** Grind choices from Square; empty when the item isn't ground to order. */
+  grindOptions: { id: string; name: string; price_cents: number }[];
   orderedBefore: boolean;
   highlighted: boolean;
 }
@@ -31,6 +33,9 @@ export interface CatalogItemView {
 export function CatalogBrowser({ items }: { items: CatalogItemView[] }) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
+  // Chosen grind per item id. Defaults to the item's first Square option
+  // (Whole Bean) until the buyer picks something else.
+  const [grindByItem, setGrindByItem] = useState<Record<string, string>>({});
 
   // Distinct categories with item counts, alphabetical.
   const categories = useMemo(() => {
@@ -152,6 +157,36 @@ export function CatalogBrowser({ items }: { items: CatalogItemView[] }) {
                     {item.description}
                   </p>
                 )}
+                {item.grindOptions.length > 0 && (
+                  <div className="pt-2">
+                    <label
+                      htmlFor={`grind-${item.id}`}
+                      className="block text-xs font-medium text-muted-foreground mb-1"
+                    >
+                      Grind
+                    </label>
+                    <select
+                      id={`grind-${item.id}`}
+                      value={grindByItem[item.id] ?? item.grindOptions[0].id}
+                      onChange={(e) =>
+                        setGrindByItem((prev) => ({
+                          ...prev,
+                          [item.id]: e.target.value,
+                        }))
+                      }
+                      className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {item.grindOptions.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                          {g.price_cents > 0
+                            ? ` (+$${(g.price_cents / 100).toFixed(2)})`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-end justify-between mt-auto pt-3 gap-3">
                   <div className="min-w-0">
                     <p className="font-bold text-lg">{priceLabel(item)}</p>
@@ -161,9 +196,7 @@ export function CatalogBrowser({ items }: { items: CatalogItemView[] }) {
                       </p>
                     )}
                   </div>
-                  <Link
-                    href={`/portal/reorder?sku=${encodeURIComponent(item.id)}`}
-                  >
+                  <Link href={addToOrderHref(item, grindByItem[item.id])}>
                     <Button size="sm">
                       <Plus className="h-4 w-4 mr-1" />
                       Add to order
@@ -177,6 +210,18 @@ export function CatalogBrowser({ items }: { items: CatalogItemView[] }) {
       )}
     </div>
   );
+}
+
+/**
+ * Deep link into the reorder cart, carrying the chosen grind so the cart
+ * arrives pre-set. Falls back to the item's first grind option when the
+ * buyer didn't touch the dropdown.
+ */
+function addToOrderHref(item: CatalogItemView, chosenGrindId?: string): string {
+  const params = new URLSearchParams({ sku: item.id });
+  const grindId = chosenGrindId ?? item.grindOptions[0]?.id;
+  if (grindId) params.set("grind", grindId);
+  return `/portal/reorder?${params.toString()}`;
 }
 
 /** Price label: single price, or a range when an item has multiple sizes. */

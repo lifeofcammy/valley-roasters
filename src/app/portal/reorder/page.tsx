@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import {
   calculateDeliveryFeeCents,
+  DELIVERY_FEE_CENTS,
   DELIVERY_FEE_FREE_THRESHOLD_CENTS,
 } from "@/lib/constants";
 
@@ -44,6 +45,10 @@ interface CartItem {
   size: string;
   quantity: number;
   unit_price_cents: number;
+  /** Chosen grind (a Square modifier option), when the item offers one. */
+  grind?: { id: string; name: string } | null;
+  /** All grind choices for this item, so the cart can offer a re-pick. */
+  grind_options?: { id: string; name: string }[];
 }
 
 type Frequency = "weekly" | "biweekly" | "monthly";
@@ -72,6 +77,7 @@ export default function ReorderPage() {
   // `sku` is the Square catalog item id, `variation` is optional
   // (falls back to "1lb" if missing).
   const skuParam = searchParams.get("sku");
+  const grindParam = searchParams.get("grind");
   const supabase = createClient();
   const { isImpersonating } = useImpersonation();
 
@@ -88,6 +94,8 @@ export default function ReorderPage() {
   const [frequency, setFrequency] = useState<Frequency>("biweekly");
   // Credit hold — set when the buyer has an outstanding Square invoice.
   const [hold, setHold] = useState<OrderHoldState | null>(null);
+  // True for distant accounts that pay delivery on every order.
+  const [alwaysChargeDelivery, setAlwaysChargeDelivery] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -102,15 +110,26 @@ export default function ReorderPage() {
         .eq("is_active", true)
         .order("sort_order");
 
-      // Credit hold check — surfaces an outstanding invoice before the
-      // buyer bothers building a cart. Advisory; /api/orders re-checks.
-      fetch("/api/portal/order-hold", { credentials: "include" })
+      // Buyer rules: credit hold + delivery policy. Surfaces an
+      // outstanding invoice before they bother building a cart, and lets
+      // the total reflect their delivery terms. Advisory; /api/orders
+      // recomputes both.
+      fetch("/api/portal/order-context", { credentials: "include" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((h: OrderHoldState | null) => {
-          if (h) setHold(h);
-        })
+        .then(
+          (
+            ctx: {
+              hold: OrderHoldState;
+              delivery: { alwaysCharge: boolean };
+            } | null
+          ) => {
+            if (!ctx) return;
+            setHold(ctx.hold);
+            setAlwaysChargeDelivery(Boolean(ctx.delivery?.alwaysCharge));
+          }
+        )
         .catch(() => {
-          // Non-fatal — checkout still enforces the hold server-side.
+          // Non-fatal — checkout still enforces both server-side.
         });
 
       const { data: pricing } = await supabase
@@ -174,9 +193,17 @@ export default function ReorderPage() {
               const item = data.item as {
                 name: string;
                 variations: Array<{ id: string; name: string; price_cents: number }>;
+                grind_options?: Array<{ id: string; name: string }>;
               };
               const first = item.variations[0];
               if (first) {
+                const grindOptions = item.grind_options ?? [];
+                // Honour ?grind= from the catalog; otherwise default to
+                // the item's first Square option (Whole Bean).
+                const chosen =
+                  grindOptions.find((g) => g.id === grindParam) ??
+                  grindOptions[0] ??
+                  null;
                 setCart([
                   {
                     product_id: null,
@@ -184,6 +211,13 @@ export default function ReorderPage() {
                     size: first.name || "1lb",
                     quantity: 1,
                     unit_price_cents: first.price_cents,
+                    grind: chosen
+                      ? { id: chosen.id, name: chosen.name }
+                      : null,
+                    grind_options: grindOptions.map((g) => ({
+                      id: g.id,
+                      name: g.name,
+                    })),
                   },
                 ]);
               }
@@ -198,7 +232,7 @@ export default function ReorderPage() {
     }
 
     loadData();
-  }, [fromOrderId, skuParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fromOrderId, skuParam, grindParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateCartItem(index: number, updates: Partial<CartItem>) {
     setCart((prev) =>
@@ -214,12 +248,14 @@ export default function ReorderPage() {
     (sum, item) => sum + item.unit_price_cents * item.quantity,
     0
   );
-  const deliveryFee = calculateDeliveryFeeCents(subtotal);
+  const deliveryFee = calculateDeliveryFeeCents(subtotal, {
+    alwaysCharge: alwaysChargeDelivery,
+  });
   const total = subtotal + deliveryFee;
-  const remainingForFreeShipping = Math.max(
-    0,
-    DELIVERY_FEE_FREE_THRESHOLD_CENTS - subtotal
-  );
+  // Distant accounts never unlock free delivery, so don't dangle it.
+  const remainingForFreeShipping = alwaysChargeDelivery
+    ? 0
+    : Math.max(0, DELIVERY_FEE_FREE_THRESHOLD_CENTS - subtotal);
 
   async function handlePlaceOrder() {
     if (isImpersonating) {
@@ -405,6 +441,30 @@ export default function ReorderPage() {
                           ${(item.unit_price_cents / 100).toFixed(2)} /{" "}
                           {product?.unit ?? "lb"}
                         </p>
+                        {item.grind_options &&
+                          item.grind_options.length > 0 && (
+                            <select
+                              aria-label={`Grind for ${item.product_name}`}
+                              value={item.grind?.id ?? ""}
+                              onChange={(e) => {
+                                const opt = item.grind_options?.find(
+                                  (g) => g.id === e.target.value
+                                );
+                                updateCartItem(index, {
+                                  grind: opt
+                                    ? { id: opt.id, name: opt.name }
+                                    : null,
+                                });
+                              }}
+                              className="mt-1.5 h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                              {item.grind_options.map((g) => (
+                                <option key={g.id} value={g.id}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                       </div>
 
                       <Select
@@ -518,7 +578,12 @@ export default function ReorderPage() {
                   <span>Total</span>
                   <span>${(total / 100).toFixed(2)}</span>
                 </div>
-                {remainingForFreeShipping > 0 ? (
+                {alwaysChargeDelivery ? (
+                  <p className="text-xs text-muted-foreground">
+                    A flat ${(DELIVERY_FEE_CENTS / 100).toFixed(2)} delivery
+                    fee applies to your location on every order.
+                  </p>
+                ) : remainingForFreeShipping > 0 ? (
                   <p className="text-xs text-muted-foreground">
                     Add{" "}
                     <strong>

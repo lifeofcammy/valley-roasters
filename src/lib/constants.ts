@@ -95,7 +95,18 @@ export const DELIVERY_FEE_CENTS = 500;
 export const DELIVERY_FEE_FREE_THRESHOLD_CENTS = 30_000; // $300.00
 export const DELIVERY_FEE_LABEL = "Delivery";
 
-export function calculateDeliveryFeeCents(subtotalCents: number): number {
+/**
+ * Flat delivery fee for an order.
+ *
+ * `alwaysCharge` is for accounts far enough out that Valley charges the
+ * fee on every order regardless of subtotal (Sahara, Shaghf Glendale) —
+ * see `alwaysChargesDelivery` in lib/account-pricing.ts.
+ */
+export function calculateDeliveryFeeCents(
+  subtotalCents: number,
+  opts?: { alwaysCharge?: boolean }
+): number {
+  if (opts?.alwaysCharge) return DELIVERY_FEE_CENTS;
   return subtotalCents < DELIVERY_FEE_FREE_THRESHOLD_CENTS
     ? DELIVERY_FEE_CENTS
     : 0;

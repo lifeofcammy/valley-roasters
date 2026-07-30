@@ -10,6 +10,7 @@ import {
   isSquareConfigured,
   type SquareCatalogItem,
 } from "@/lib/square/client";
+import { coffeeCategoryIdFor, isVisibleToAccount } from "@/lib/account-pricing";
 
 /**
  * Wholesale buyer catalog — every item Valley sells, pulled live from
@@ -34,9 +35,9 @@ export default async function CatalogPage() {
     );
   }
 
-  let items: SquareCatalogItem[] = [];
+  let allItems: SquareCatalogItem[] = [];
   try {
-    items = await fetchValleyCatalog();
+    allItems = await fetchValleyCatalog();
   } catch (err) {
     console.error("[portal/catalog] fetch failed:", err);
     return (
@@ -45,6 +46,14 @@ export default async function CatalogPage() {
       </div>
     );
   }
+
+  // Narrow to what this account may buy: their own coffee price list plus
+  // the shared food / pastry / Lezzet categories. Other accounts' coffee
+  // categories (and Top Cup's internal cost pricing) are filtered out.
+  const buyerCoffeeCategoryId = coffeeCategoryIdFor(profile?.square_customer_id);
+  const items = allItems.filter((it) =>
+    isVisibleToAccount(it.category_id, buyerCoffeeCategoryId)
+  );
 
   // Build the set of item names this buyer has ordered before, so we can
   // surface "New to you" items. We compare by normalized name because
@@ -110,6 +119,7 @@ export default async function CatalogPage() {
     primary_image_url: item.primary_image_url,
     category: item.category,
     variations: item.variations,
+    grindOptions: item.grind_options,
     orderedBefore: isOrderedBefore(item),
     highlighted: highlightIds.has(item.id),
   }));
