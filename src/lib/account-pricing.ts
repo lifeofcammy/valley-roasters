@@ -65,10 +65,23 @@ const ACCOUNT_COFFEE_CATEGORY: Record<string, string> = {
   D5SNV1ACZZXNAEMQ6KTKMNER4R: CATEGORY.SHAGHF_GLENDALE, // Shaghf Cafe Glendale
   W1F0JZTDCX0G31ZMF1YY5BJWNR: CATEGORY.TEN_NINETEEN, // 10:19 Coffee
   // Top Cup's café locations buy from Valley at the "TC ___" tier.
-  // Added 2026-08-05 at Charlie/Jackie's request. A Phoenix location was
-  // asked for too, but no Square customer record exists for it yet.
-  "3NBPNSM2EPJGHBYB5W0BPVPHQM": CATEGORY.TOP_CUP, // Top Cup Coffee - Gilbert
-  "9NQ3M7JAJGZF811AZJGXHST5F0": CATEGORY.TOP_CUP, // Top Cup Coffee - Tempe
+  // Added 2026-08-05 at Charlie/Jackie's request.
+  //
+  // Each location is listed twice on purpose. Valley has invoiced these
+  // three for months under one set of customer records, and on 2026-08-04
+  // two NEW records were created for Gilbert and Tempe with slightly
+  // different names ("Top Cup Coffee - Gilbert" vs "Top Cup Coffee
+  // Gilbert"). Both are mapped so pricing is correct whichever record a
+  // portal login ends up attached to.
+  //
+  // The originals are the ones to keep: they carry the order history the
+  // portal reads. The 2026-08-04 duplicates should be merged into them in
+  // Square, and these two lines deleted once that's done.
+  DQG95BVDT6XD35KDMXPKFQW7FG: CATEGORY.TOP_CUP, // Top Cup Coffee Gilbert (26 invoices)
+  FYW476XAKRWK4ETH5EQP1EA4P0: CATEGORY.TOP_CUP, // Top Cup Tempe (11 invoices)
+  "8TG7TEER56SX77RY97KZ58C3SW": CATEGORY.TOP_CUP, // TC Downtown Phoenix (14 invoices)
+  "3NBPNSM2EPJGHBYB5W0BPVPHQM": CATEGORY.TOP_CUP, // dup created 2026-08-04 — merge into Gilbert
+  "9NQ3M7JAJGZF811AZJGXHST5F0": CATEGORY.TOP_CUP, // dup created 2026-08-04 — merge into Tempe
 };
 
 /** Every per-account coffee category, so we can exclude other accounts'. */
