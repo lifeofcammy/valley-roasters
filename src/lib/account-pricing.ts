@@ -58,15 +58,17 @@ export const SHARED_CATEGORY_IDS: readonly string[] = [
  * Crepe Club, Foch Cafe, Sip & Shop, Grotti's Pizza and Aj Jazzar today.
  * Give one of them their own pricing by creating a Square category and
  * adding a line here.
- *
- * TOP_CUP is intentionally never assigned: it's Top Cup's internal cost
- * pricing, not a wholesale rate, and must never reach a buyer.
  */
 const ACCOUNT_COFFEE_CATEGORY: Record<string, string> = {
   WQSZ308EWEQ7WV03QS9PFK1PR0: CATEGORY.BEANCHAIN, // Beanchain Coffee
   E8ZG7SJYETM6YT83VZZ0E3WHCR: CATEGORY.SHAGHF_TEMPE, // Shaghf Cafe
   D5SNV1ACZZXNAEMQ6KTKMNER4R: CATEGORY.SHAGHF_GLENDALE, // Shaghf Cafe Glendale
   W1F0JZTDCX0G31ZMF1YY5BJWNR: CATEGORY.TEN_NINETEEN, // 10:19 Coffee
+  // Top Cup's café locations buy from Valley at the "TC ___" tier.
+  // Added 2026-08-05 at Charlie/Jackie's request. A Phoenix location was
+  // asked for too, but no Square customer record exists for it yet.
+  "3NBPNSM2EPJGHBYB5W0BPVPHQM": CATEGORY.TOP_CUP, // Top Cup Coffee - Gilbert
+  "9NQ3M7JAJGZF811AZJGXHST5F0": CATEGORY.TOP_CUP, // Top Cup Coffee - Tempe
 };
 
 /** Every per-account coffee category, so we can exclude other accounts'. */

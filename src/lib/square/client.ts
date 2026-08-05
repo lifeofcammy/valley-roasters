@@ -337,8 +337,15 @@ const GRIND_MODIFIER_LIST_IDS = new Set([
 const COFFEE_CATALOG_KEYWORDS =
   /\b(roast|brazil|honduras|guatemala|ethiopia|colombia|sumatra|kenya|decaf|espresso|drip|whole bean|bean|blend|coffee)\b/i;
 
-// Top Cup uses "TC" as a prefix on internal-only SKUs that should
-// never show up on Valley's site.
+/**
+ * "TC ___" SKUs are Top Cup's own price tier.
+ *
+ * These are hidden from the PUBLIC wholesale page (nobody browsing the
+ * marketing site should see another business's negotiated rate), but they
+ * are NOT hidden from the portal — the Top Cup café accounts are real
+ * wholesale customers and this is the pricing they buy at. The portal
+ * keeps them isolated by category instead, via `isVisibleToAccount`.
+ */
 function isTopCupInternal(name: string): boolean {
   return /^tc[\s-]/i.test(name.trim()) || /^tc\d/i.test(name.trim());
 }
@@ -427,14 +434,15 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
     cursor = data.cursor;
   } while (cursor);
 
-  // 2. Keep live ITEMs with a name; drop Top Cup internal SKUs.
+  // 2. Keep live ITEMs with a name. Top Cup's "TC ___" SKUs stay in —
+  //    the Top Cup café accounts buy at that tier, and per-account
+  //    category filtering (isVisibleToAccount) keeps them away from
+  //    everyone else. They're stripped from the public page instead,
+  //    in fetchCoffeeCatalog below.
   const items = allItems.filter((obj) => {
     if (obj.type !== "ITEM") return false;
     if (obj.is_deleted) return false;
-    const name = obj.item_data?.name ?? "";
-    if (!name) return false;
-    if (isTopCupInternal(name)) return false;
-    return true;
+    return Boolean(obj.item_data?.name);
   });
 
   // 3. Resolve reporting-category ids to names (best-effort).
@@ -569,13 +577,19 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
 }
 
 /**
- * Coffee-only slice of the Valley catalog — used by the public
- * wholesale marketing page and admin products view. Filters
- * `fetchValleyCatalog()` down to coffee SKUs by name keyword.
+ * Coffee-only slice of the Valley catalog — used by the public wholesale
+ * marketing page and the admin products view.
+ *
+ * Excludes Top Cup's "TC ___" SKUs: that's one account's negotiated
+ * pricing and it has no business appearing on a public page. Top Cup
+ * still sees them in their own portal via category filtering.
  */
 export async function fetchCoffeeCatalog(): Promise<SquareCoffeeItem[]> {
   const all = await fetchValleyCatalog();
-  return all.filter((item) => COFFEE_CATALOG_KEYWORDS.test(item.name));
+  return all.filter(
+    (item) =>
+      COFFEE_CATALOG_KEYWORDS.test(item.name) && !isTopCupInternal(item.name)
+  );
 }
 
 /* ------------------------------------------------------------- */
