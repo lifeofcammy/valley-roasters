@@ -52,7 +52,7 @@ export default async function CatalogPage() {
   // categories (and Top Cup's internal cost pricing) are filtered out.
   const buyerCoffeeCategoryId = coffeeCategoryIdFor(profile?.square_customer_id);
   const items = allItems.filter((it) =>
-    isVisibleToAccount(it.category_id, buyerCoffeeCategoryId)
+    isVisibleToAccount(it.category_id, buyerCoffeeCategoryId, it.id)
   );
 
   // Build the set of item names this buyer has ordered before, so we can

@@ -96,6 +96,55 @@ const ALL_ACCOUNT_COFFEE_CATEGORIES: readonly string[] = [
   CATEGORY.TOP_CUP,
 ];
 
+/**
+ * COGS rows — Valley's own cost basis, confirmed by the client 2026-08-05.
+ * These must NEVER reach a buyer: publishing them would let customers
+ * order at cost (several are ~$5 below the sell price of the same item)
+ * and would expose Valley's margin on everything.
+ *
+ * They're uncategorized in Square today, and `isVisibleToAccount` already
+ * hides anything without a category — but that's incidental, not a
+ * safeguard. The moment somebody files one of these into a customer
+ * category for bookkeeping, it would appear on the site at cost. This
+ * list makes the exclusion explicit and survives that mistake.
+ *
+ * If Valley moves these into a dedicated "Internal — COGS" category,
+ * add that category id to NEVER_VISIBLE_CATEGORY_IDS below and new cost
+ * rows are covered automatically.
+ */
+const COGS_ITEM_IDS: ReadonlySet<string> = new Set([
+  "MRFI5Q4EH4YXSPFZU5RMU4HK", // Bone-In Chicken Wings      $95.00
+  "QBRBUY4X5VGV26K6H5NJ75XT", // Boneless Chicken           $164.00
+  "26GMCXU52X5JUVHVTHO7MXTJ", // Cardamom (Lezzet) - 17oz   $10.05
+  "T6FCRCSYJMT3WNNRT26QXC5V", // Chipotle Aioli             $14.00
+  "A5HLJDWIQ5VXSHCLCM4MUJLR", // Cinnamon (Lezzet) - 17oz   $10.05
+  "UECQYXE5C4BAL34SHD47ES5O", // Decaf Cardamom - 17.6oz    $9.00
+  "P2WZO3FIWSGOOZKFEOTSCQ6F", // Decaf Cinnamon - 17.6oz    $9.00
+  "YOEDZXHCBZ46DLVNWPZVQXO2", // Decaf Traditional - 17.6oz $8.81
+  "JM5HXLE2OLDD76WMWEDRDLNJ", // Dough (50lbs)              $36.50
+  "TKZWA3SWLHJ4S6BTZMPM46FR", // Hybrid Kitchen (1)         $5.00
+  "SM653LBVAHLBLO3FXZAHL55M", // Hybrid Kitchen (2)         $6.00
+  "4GREWSEQVIPNUBKK7JVREHZ6", // Hybrid Manager             $7.00
+  "DVZUM7O2C3NWZN4UBTPBWPQW", // Lezzet Traditional 17.6oz  $10.53
+  "OFCTBHSRUOYKYO6HADVW2FOM", // Lezzet Wholebean 17.6oz    $10.36
+]);
+
+/**
+ * Categories that must never be shown to a buyer, whatever else matches.
+ * Empty until Valley creates an "Internal — COGS" category.
+ */
+const NEVER_VISIBLE_CATEGORY_IDS: readonly string[] = [];
+
+/** True when this item is internal cost data rather than a sellable product. */
+export function isInternalCostItem(
+  itemId: string,
+  categoryId: string | null
+): boolean {
+  if (COGS_ITEM_IDS.has(itemId)) return true;
+  if (categoryId && NEVER_VISIBLE_CATEGORY_IDS.includes(categoryId)) return true;
+  return false;
+}
+
 /** Which coffee category this buyer sees. Falls back to the default list. */
 export function coffeeCategoryIdFor(
   squareCustomerId: string | null | undefined
@@ -115,8 +164,11 @@ export function coffeeCategoryIdFor(
  */
 export function isVisibleToAccount(
   categoryId: string | null,
-  buyerCoffeeCategoryId: string
+  buyerCoffeeCategoryId: string,
+  itemId?: string
 ): boolean {
+  // Cost rows are never sellable, whatever category they end up in.
+  if (itemId && isInternalCostItem(itemId, categoryId)) return false;
   if (!categoryId) return false;
   if (categoryId === buyerCoffeeCategoryId) return true;
   if (SHARED_CATEGORY_IDS.includes(categoryId)) return true;
