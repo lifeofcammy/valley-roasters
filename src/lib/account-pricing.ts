@@ -113,20 +113,20 @@ const ALL_ACCOUNT_COFFEE_CATEGORIES: readonly string[] = [
  * rows are covered automatically.
  */
 const COGS_ITEM_IDS: ReadonlySet<string> = new Set([
-  "MRFI5Q4EH4YXSPFZU5RMU4HK", // Bone-In Chicken Wings      $95.00
-  "QBRBUY4X5VGV26K6H5NJ75XT", // Boneless Chicken           $164.00
-  "26GMCXU52X5JUVHVTHO7MXTJ", // Cardamom (Lezzet) - 17oz   $10.05
-  "T6FCRCSYJMT3WNNRT26QXC5V", // Chipotle Aioli             $14.00
-  "A5HLJDWIQ5VXSHCLCM4MUJLR", // Cinnamon (Lezzet) - 17oz   $10.05
-  "UECQYXE5C4BAL34SHD47ES5O", // Decaf Cardamom - 17.6oz    $9.00
-  "P2WZO3FIWSGOOZKFEOTSCQ6F", // Decaf Cinnamon - 17.6oz    $9.00
-  "YOEDZXHCBZ46DLVNWPZVQXO2", // Decaf Traditional - 17.6oz $8.81
-  "JM5HXLE2OLDD76WMWEDRDLNJ", // Dough (50lbs)              $36.50
-  "TKZWA3SWLHJ4S6BTZMPM46FR", // Hybrid Kitchen (1)         $5.00
-  "SM653LBVAHLBLO3FXZAHL55M", // Hybrid Kitchen (2)         $6.00
-  "4GREWSEQVIPNUBKK7JVREHZ6", // Hybrid Manager             $7.00
-  "DVZUM7O2C3NWZN4UBTPBWPQW", // Lezzet Traditional 17.6oz  $10.53
-  "OFCTBHSRUOYKYO6HADVW2FOM", // Lezzet Wholebean 17.6oz    $10.36
+  "MRFI5Q4EH4YXSPFZU5RMU4HK", // Bone-In Chicken Wings
+  "QBRBUY4X5VGV26K6H5NJ75XT", // Boneless Chicken
+  "26GMCXU52X5JUVHVTHO7MXTJ", // Cardamom (Lezzet) - 17oz
+  "T6FCRCSYJMT3WNNRT26QXC5V", // Chipotle Aioli
+  "A5HLJDWIQ5VXSHCLCM4MUJLR", // Cinnamon (Lezzet) - 17oz
+  "UECQYXE5C4BAL34SHD47ES5O", // Decaf Cardamom - 17.6oz
+  "P2WZO3FIWSGOOZKFEOTSCQ6F", // Decaf Cinnamon - 17.6oz
+  "YOEDZXHCBZ46DLVNWPZVQXO2", // Decaf Traditional - 17.6oz
+  "JM5HXLE2OLDD76WMWEDRDLNJ", // Dough (50lbs)
+  "TKZWA3SWLHJ4S6BTZMPM46FR", // Hybrid Kitchen (1)
+  "SM653LBVAHLBLO3FXZAHL55M", // Hybrid Kitchen (2)
+  "4GREWSEQVIPNUBKK7JVREHZ6", // Hybrid Manager
+  "DVZUM7O2C3NWZN4UBTPBWPQW", // Lezzet Traditional 17.6oz
+  "OFCTBHSRUOYKYO6HADVW2FOM", // Lezzet Wholebean 17.6oz
 ]);
 
 /**
