@@ -81,18 +81,28 @@ export async function addCustomerAction(
   //    so the customer had no way to ever sign in.)
   const { data: authUser, error: authError } =
     await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${SITE_URL}/auth/callback?next=/welcome`,
+      redirectTo: `${SITE_URL}/welcome`,
       data: { company_name: companyName, full_name: contactName },
     });
 
   if (authError || !authUser?.user) {
     console.error("Failed to invite user:", authError);
-    return {
-      success: false,
-      error:
-        authError?.message ??
-        "Could not send the invite. The email may already have an account.",
-    };
+    // Translate Supabase's terse auth errors into something an admin can
+    // act on — these two come up constantly when onboarding a batch of
+    // locations that share an inbox.
+    const raw = authError?.message ?? "";
+    let friendly =
+      "Could not send the invite. Please try again in a few minutes.";
+    if (/rate limit/i.test(raw)) {
+      friendly =
+        "Email limit reached — Supabase only allows a few invites per hour on the current plan. Wait about an hour and try again, or ask Cam to switch on Valley's own email sending to remove the limit.";
+    } else if (/already|exists|registered/i.test(raw)) {
+      friendly =
+        `${email} already has an account. Each location needs its own email address — for a shared inbox you can use a tag like name+phoenix@gmail.com, which still delivers to the same inbox. If the account already exists, open it and use "Send login link" instead.`;
+    } else if (raw) {
+      friendly = raw;
+    }
+    return { success: false, error: friendly };
   }
 
   // 3. Create profile row linked to the Square customer, marked as approved
@@ -155,10 +165,12 @@ export async function resendInviteAction(
   const email = (formData.get("email") as string)?.trim().toLowerCase();
   if (!email) return { success: false, error: "Email is required." };
 
-  // resetPasswordForEmail sends the mail; the link lands on /auth/callback
-  // which exchanges the code and drops them on /welcome to pick a password.
+  // Land straight on /welcome. It's a client page, so it can read the
+  // access token Supabase returns in the URL hash — a server route can't,
+  // which is why routing these through /auth/callback produced an error
+  // page for every recipient.
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${SITE_URL}/auth/callback?next=/welcome`,
+    redirectTo: `${SITE_URL}/welcome`,
   });
 
   if (error) {

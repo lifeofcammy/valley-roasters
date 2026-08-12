@@ -32,28 +32,90 @@ export default function WelcomePage() {
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // The invite link creates the session before redirecting here. If it's
-  // missing, the link was already used or expired.
+  // Establish the session from whatever Supabase put in the invite link.
+  //
+  // Supabase sends these three ways depending on flow and email template,
+  // so handle all of them rather than betting on one:
+  //   1. ?token_hash=..&type=invite   -> verifyOtp (custom template)
+  //   2. #access_token=..&refresh_token=..  -> the browser client picks
+  //      this up itself via detectSessionInUrl; we just wait for it. This
+  //      is what admin-generated invites use, and it's why pointing the
+  //      link at a server route never worked: a hash fragment is never
+  //      sent to the server.
+  //   3. ?code=..                     -> PKCE, only when the same browser
+  //      started the flow.
   useEffect(() => {
     let active = true;
+
+    async function loadProfile(userId: string) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (active) setCompanyName(profile?.company_name ?? null);
+    }
+
+    async function settle(userId: string) {
+      if (!active) return;
+      setHasSession(true);
+      await loadProfile(userId);
+      if (active) setChecking(false);
+    }
+
+    // Supabase reports a dead link in the hash — show the expired state
+    // rather than spinning.
+    const hash = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.hash.slice(1) : ""
+    );
+    if (hash.get("error")) {
+      setChecking(false);
+      return;
+    }
+
+    // Fires once the browser client finishes reading tokens out of the URL.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) void settle(session.user.id);
+    });
+
     (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+      const code = params.get("code");
+
+      if (tokenHash && type) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: type as "invite" | "recovery" | "email" | "magiclink",
+        });
+        if (!error && data.user) return settle(data.user.id);
+      } else if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(
+          code
+        );
+        if (!error && data.user) return settle(data.user.id);
+      }
+
+      // Either the hash flow is still landing (onAuthStateChange will fire)
+      // or there's already a session from a previous visit.
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!active) return;
-      setHasSession(Boolean(user));
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("company_name")
-          .eq("id", user.id)
-          .maybeSingle();
-        if (active) setCompanyName(profile?.company_name ?? null);
-      }
-      setChecking(false);
+      if (user) return settle(user.id);
+
+      // Give detectSessionInUrl a moment before declaring the link dead.
+      setTimeout(() => {
+        if (active) setChecking(false);
+      }, 1500);
     })();
+
     return () => {
       active = false;
+      subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
