@@ -133,6 +133,108 @@ export async function addCustomerAction(
 }
 
 /**
+ * Edit a customer's contact details — email, contact name, company
+ * name, phone.
+ *
+ * Exists so Valley staff can fix onboarding typos themselves (a
+ * misspelled email once left an invited buyer with an unreachable
+ * account that only a developer could repair). Email is the delicate
+ * field: it lives in Supabase Auth, not just our profiles table, so a
+ * change must go through the auth admin API first — if that fails
+ * (e.g. the address already belongs to another account) nothing else
+ * is touched. `email_confirm: true` keeps the account usable
+ * immediately; the buyer's password is unchanged.
+ */
+export async function updateCustomerDetailsAction(
+  _prev: AddCustomerState,
+  formData: FormData
+): Promise<AddCustomerState> {
+  const supabase = await createClient();
+  const {
+    data: { user: actor },
+  } = await supabase.auth.getUser();
+  if (!actor) return { success: false, error: "Not authenticated" };
+
+  const { data: actorProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", actor.id)
+    .maybeSingle();
+  if (actorProfile?.role !== "admin")
+    return { success: false, error: "Forbidden" };
+
+  const customerId = (formData.get("customer_id") as string)?.trim();
+  const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const contactName = (formData.get("contact_name") as string)?.trim();
+  const companyName = (formData.get("company_name") as string)?.trim();
+  const phone = (formData.get("phone") as string)?.trim() || null;
+
+  if (!customerId) return { success: false, error: "Missing customer id." };
+  if (!companyName || !contactName || !email) {
+    return {
+      success: false,
+      error: "Company name, contact name, and email are required.",
+    };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email address." };
+  }
+
+  const admin = createAdminClient();
+
+  // Never let an admin edit another admin's account through this form.
+  const { data: target } = await admin
+    .from("profiles")
+    .select("email, role")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (!target) return { success: false, error: "Customer not found." };
+  if (target.role !== "customer") {
+    return { success: false, error: "Only customer accounts can be edited here." };
+  }
+
+  // 1. Email changes go through Supabase Auth first. If this fails,
+  //    stop before touching the profile so the two never disagree.
+  if (email !== (target.email ?? "").toLowerCase()) {
+    const { error: authError } = await admin.auth.admin.updateUserById(
+      customerId,
+      { email, email_confirm: true }
+    );
+    if (authError) {
+      return {
+        success: false,
+        error:
+          authError.message ??
+          "Could not change the email. It may already be in use by another account.",
+      };
+    }
+  }
+
+  // 2. Profile fields.
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({
+      email,
+      full_name: contactName,
+      company_name: companyName,
+      company_phone: phone,
+    })
+    .eq("id", customerId);
+
+  if (profileError) {
+    console.error("Failed to update customer profile:", profileError);
+    return {
+      success: false,
+      error: "Login email was updated but profile details failed — try again.",
+    };
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${customerId}`);
+  return { success: true, error: null };
+}
+
+/**
  * Email an existing customer a fresh link to set their password.
  *
  * Covers three cases:

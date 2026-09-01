@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft, Eye } from "lucide-react";
 import { ResendInviteButton } from "./resend-invite-button";
+import { EditCustomerDetails } from "./edit-customer-details";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -133,6 +134,15 @@ export default async function AdminCustomerDetailPage({
           {customer.is_approved ? "Approved" : "Pending"}
         </Badge>
       </div>
+
+      {/* Contact details — editable so staff can fix onboarding typos */}
+      <EditCustomerDetails
+        customerId={customer.id}
+        email={customer.email ?? ""}
+        contactName={customer.full_name ?? ""}
+        companyName={customer.company_name ?? ""}
+        phone={customer.company_phone ?? ""}
+      />
 
       {/* Status & Internal Notes — admin-only edit form */}
       <form action={updateAdminFields} className="mb-6">
