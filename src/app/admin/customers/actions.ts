@@ -285,3 +285,66 @@ export async function resendInviteAction(
 
   return { success: true, error: null };
 }
+
+/**
+ * Assign which Square category is this customer's coffee price list,
+ * and whether the flat delivery fee applies to every order.
+ *
+ * This IS the catalog control: Charlie builds a category in Square,
+ * then picks it here. Clearing the selection (empty value) hides the
+ * customer's entire catalog until a new one is chosen — deliberate,
+ * per the client's "no default pricing" rule.
+ */
+export async function updateCatalogAssignmentAction(
+  _prev: AddCustomerState,
+  formData: FormData
+): Promise<AddCustomerState> {
+  const supabase = await createClient();
+  const {
+    data: { user: actor },
+  } = await supabase.auth.getUser();
+  if (!actor) return { success: false, error: "Not authenticated" };
+
+  const { data: actorProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", actor.id)
+    .maybeSingle();
+  if (actorProfile?.role !== "admin")
+    return { success: false, error: "Forbidden" };
+
+  const customerId = (formData.get("customer_id") as string)?.trim();
+  const categoryId =
+    ((formData.get("price_category_id") as string) || "").trim() || null;
+  const alwaysDelivery = formData.get("always_charge_delivery") === "on";
+
+  if (!customerId) return { success: false, error: "Missing customer id." };
+
+  const admin = createAdminClient();
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (!target) return { success: false, error: "Customer not found." };
+  if (target.role !== "customer") {
+    return { success: false, error: "Only customer accounts can be edited here." };
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({
+      square_price_category_id: categoryId,
+      always_charge_delivery: alwaysDelivery,
+    })
+    .eq("id", customerId);
+
+  if (error) {
+    console.error("Failed to update catalog assignment:", error);
+    return { success: false, error: "Could not save. Please try again." };
+  }
+
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${customerId}`);
+  return { success: true, error: null };
+}

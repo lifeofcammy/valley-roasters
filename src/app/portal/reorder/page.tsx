@@ -29,16 +29,6 @@ import {
   DELIVERY_FEE_FREE_THRESHOLD_CENTS,
 } from "@/lib/constants";
 
-interface Product {
-  id: string;
-  name: string;
-  available_sizes: string[];
-  base_price_cents: number;
-  min_order_qty: number;
-  unit: string;
-  effective_price_cents?: number;
-}
-
 interface CartItem {
   product_id: string | null;
   product_name: string;
@@ -81,7 +71,6 @@ export default function ReorderPage() {
   const supabase = createClient();
   const { isImpersonating } = useImpersonation();
 
-  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
@@ -104,12 +93,6 @@ export default function ReorderPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: prods } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order");
-
       // Buyer rules: credit hold + delivery policy. Surfaces an
       // outstanding invoice before they bother building a cart, and lets
       // the total reflect their delivery terms. Advisory; /api/orders
@@ -131,20 +114,6 @@ export default function ReorderPage() {
         .catch(() => {
           // Non-fatal — checkout still enforces both server-side.
         });
-
-      const { data: pricing } = await supabase
-        .from("customer_pricing")
-        .select("product_id, price_cents");
-
-      const pricingMap = new Map(
-        pricing?.map((p) => [p.product_id, p.price_cents]) ?? []
-      );
-
-      const productsWithPricing = (prods ?? []).map((p) => ({
-        ...p,
-        effective_price_cents: pricingMap.get(p.id) ?? p.base_price_cents,
-      }));
-      setProducts(productsWithPricing);
 
       // Pre-fill cart from past order via the unified line-items API
       // (handles both Square-backed and Supabase-backed customers)
@@ -418,17 +387,17 @@ export default function ReorderPage() {
           {cart.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                No items in your cart. Add products below.
+                Your cart is empty — add items from the Catalog page or reorder a past order.
               </CardContent>
             </Card>
           ) : (
             cart.map((item, index) => {
-              const product = products.find((p) => p.id === item.product_id);
-              const sizeOptions = product?.available_sizes ?? [
-                "1lb",
-                "5lb",
-                "10lb",
-              ];
+              // Sizes come from the item itself (Square variation names).
+              // Include the current value so deep-linked items render
+              // correctly, plus the common bag sizes for legacy rows.
+              const sizeOptions = Array.from(
+                new Set([item.size, "1lb", "5lb", "10lb"].filter(Boolean))
+              );
               return (
                 <Card key={`${item.product_id ?? item.product_name}-${index}`}>
                   <CardContent className="p-4">
@@ -439,7 +408,7 @@ export default function ReorderPage() {
                         </h3>
                         <p className="text-sm text-muted-foreground">
                           ${(item.unit_price_cents / 100).toFixed(2)} /{" "}
-                          {product?.unit ?? "lb"}
+                          {item.size || "unit"}
                         </p>
                         {item.grind_options &&
                           item.grind_options.length > 0 && (

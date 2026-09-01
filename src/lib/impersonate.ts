@@ -29,6 +29,10 @@ export interface EffectiveProfileRow {
   role: string | null;
   is_approved: boolean | null;
   square_customer_id: string | null;
+  /** Square CATEGORY id holding this account's coffee price list; null = no catalog assigned (portal shows nothing). */
+  square_price_category_id: string | null;
+  /** Flat delivery fee applies on every order regardless of subtotal. */
+  always_charge_delivery: boolean;
   company_phone: string | null;
   company_address_line1: string | null;
   company_address_line2: string | null;
@@ -83,7 +87,7 @@ export async function getEffectiveProfile(): Promise<EffectiveProfileResult> {
   const { data: selfProfile } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, company_name, role, is_approved, square_customer_id, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, internal_notes, created_at"
+      "id, email, full_name, company_name, role, is_approved, square_customer_id, square_price_category_id, always_charge_delivery, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, internal_notes, created_at"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -117,7 +121,7 @@ export async function getEffectiveProfile(): Promise<EffectiveProfileResult> {
   const { data: targetProfile } = await admin
     .from("profiles")
     .select(
-      "id, email, full_name, company_name, role, is_approved, square_customer_id, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, internal_notes, created_at"
+      "id, email, full_name, company_name, role, is_approved, square_customer_id, square_price_category_id, always_charge_delivery, company_phone, company_address_line1, company_address_line2, company_city, company_state, company_zip, internal_notes, created_at"
     )
     .eq("id", targetId)
     .maybeSingle();

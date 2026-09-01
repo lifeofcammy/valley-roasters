@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveProfile } from "@/lib/impersonate";
 import { getOrderHold, orderHoldMessage } from "@/lib/order-hold";
-import { alwaysChargesDelivery } from "@/lib/account-pricing";
 
 /**
  * Everything the reorder cart needs to know about *this* buyer before
@@ -42,7 +41,7 @@ export async function GET() {
       total_cents: hold.total_cents,
     },
     delivery: {
-      alwaysCharge: alwaysChargesDelivery(profile.square_customer_id),
+      alwaysCharge: Boolean(profile.always_charge_delivery),
     },
   });
 }

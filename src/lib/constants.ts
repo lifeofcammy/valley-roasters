@@ -99,8 +99,8 @@ export const DELIVERY_FEE_LABEL = "Delivery";
  * Flat delivery fee for an order.
  *
  * `alwaysCharge` is for accounts far enough out that Valley charges the
- * fee on every order regardless of subtotal (Sahara, Shaghf Glendale) —
- * see `alwaysChargesDelivery` in lib/account-pricing.ts.
+ * fee on every order regardless of subtotal — per-account flag
+ * `profiles.always_charge_delivery`, set from the admin customer page.
  */
 export function calculateDeliveryFeeCents(
   subtotalCents: number,

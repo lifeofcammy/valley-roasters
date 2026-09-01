@@ -10,7 +10,7 @@ import {
   isSquareConfigured,
   type SquareCatalogItem,
 } from "@/lib/square/client";
-import { coffeeCategoryIdFor, isVisibleToAccount } from "@/lib/account-pricing";
+import { isVisibleToAccount } from "@/lib/account-pricing";
 
 /**
  * Wholesale buyer catalog — every item Valley sells, pulled live from
@@ -47,10 +47,11 @@ export default async function CatalogPage() {
     );
   }
 
-  // Narrow to what this account may buy: their own coffee price list plus
-  // the shared food / pastry / Lezzet categories. Other accounts' coffee
-  // categories (and Top Cup's internal cost pricing) are filtered out.
-  const buyerCoffeeCategoryId = coffeeCategoryIdFor(profile?.square_customer_id);
+  // Narrow to what this account may buy: their assigned price list plus
+  // the shared food / pastry / Lezzet categories. Assignment lives on the
+  // profile (set by staff from the admin dropdown); no assignment means
+  // the account sees nothing until someone picks its catalog.
+  const buyerCoffeeCategoryId = profile?.square_price_category_id ?? null;
   const items = allItems.filter((it) =>
     isVisibleToAccount(it.category_id, buyerCoffeeCategoryId, it.id)
   );
@@ -137,7 +138,18 @@ export default async function CatalogPage() {
         </p>
       </div>
 
-      {views.length === 0 ? (
+      {!buyerCoffeeCategoryId ? (
+        <div className="text-center py-16 max-w-md mx-auto">
+          <p className="font-semibold text-lg">
+            Your catalog is being set up
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Valley is preparing your price list. It will appear here as soon
+            as it&apos;s assigned — check back shortly, or contact us if you
+            think this is taking too long.
+          </p>
+        </div>
+      ) : views.length === 0 ? (
         <p className="text-center text-muted-foreground py-16">
           No items available right now.
         </p>

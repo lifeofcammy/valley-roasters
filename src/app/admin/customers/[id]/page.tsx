@@ -12,6 +12,13 @@ import { ORDER_STATUS_COLORS, type OrderStatus } from "@/lib/constants";
 import { ArrowLeft, Eye } from "lucide-react";
 import { ResendInviteButton } from "./resend-invite-button";
 import { EditCustomerDetails } from "./edit-customer-details";
+import { CatalogAssignment } from "./catalog-assignment";
+import {
+  fetchValleyCategories,
+  isSquareConfigured,
+  type SquareCategoryOption,
+} from "@/lib/square/client";
+import { SHARED_CATEGORY_IDS } from "@/lib/account-pricing";
 import { format } from "date-fns";
 
 async function assertAdmin() {
@@ -30,7 +37,7 @@ export default async function AdminCustomerDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [customerRes, ordersRes, productsRes, pricingRes] = await Promise.all([
+  const [customerRes, ordersRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", id).single(),
     supabase
       .from("orders")
@@ -38,46 +45,22 @@ export default async function AdminCustomerDetailPage({
       .eq("profile_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
-    supabase.from("products").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("customer_pricing").select("*").eq("profile_id", id),
   ]);
 
   const customer = customerRes.data;
   if (!customer) notFound();
 
-  const pricingMap = new Map(
-    pricingRes.data?.map((p) => [p.product_id, p]) ?? []
-  );
-
-  async function updatePricing(formData: FormData) {
-    "use server";
-    await assertAdmin();
-    const supabase = await createClient();
-
-    for (const [key, value] of formData.entries()) {
-      if (!key.startsWith("price_")) continue;
-      const productId = key.replace("price_", "");
-      const priceCents = Math.round(parseFloat(value as string) * 100);
-
-      if (isNaN(priceCents) || priceCents <= 0) {
-        await supabase
-          .from("customer_pricing")
-          .delete()
-          .eq("profile_id", id)
-          .eq("product_id", productId);
-      } else {
-        await supabase.from("customer_pricing").upsert(
-          {
-            profile_id: id,
-            product_id: productId,
-            price_cents: priceCents,
-          },
-          { onConflict: "profile_id,product_id" }
-        );
-      }
+  // Options for the catalog dropdown — live from Square, minus the shared
+  // food/Lezzet categories (those go to everyone automatically and must
+  // not be assignable as someone's coffee price list).
+  let categoryOptions: SquareCategoryOption[] = [];
+  if (isSquareConfigured()) {
+    try {
+      const all = await fetchValleyCategories();
+      categoryOptions = all.filter((c) => !SHARED_CATEGORY_IDS.includes(c.id));
+    } catch (err) {
+      console.error("[admin/customer] category fetch failed:", err);
     }
-
-    revalidatePath(`/admin/customers/${id}`);
   }
 
   async function updateAdminFields(formData: FormData) {
@@ -144,6 +127,14 @@ export default async function AdminCustomerDetailPage({
         phone={customer.company_phone ?? ""}
       />
 
+      {/* Catalog assignment — Charlie's price-list control */}
+      <CatalogAssignment
+        customerId={customer.id}
+        currentCategoryId={customer.square_price_category_id ?? null}
+        alwaysChargeDelivery={Boolean(customer.always_charge_delivery)}
+        options={categoryOptions}
+      />
+
       {/* Status & Internal Notes — admin-only edit form */}
       <form action={updateAdminFields} className="mb-6">
         <Card>
@@ -193,65 +184,6 @@ export default async function AdminCustomerDetailPage({
       </form>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Custom Pricing */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Custom Pricing</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={updatePricing} className="space-y-4">
-              <div className="space-y-3">
-                {productsRes.data?.map((product) => {
-                  const custom = pricingMap.get(product.id);
-                  return (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Base: ${(product.base_price_cents / 100).toFixed(2)}
-                          /lb
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Label
-                          htmlFor={`price_${product.id}`}
-                          className="sr-only"
-                        >
-                          Custom price for {product.name}
-                        </Label>
-                        <span className="text-sm text-muted-foreground">
-                          $
-                        </span>
-                        <Input
-                          id={`price_${product.id}`}
-                          name={`price_${product.id}`}
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Base"
-                          defaultValue={
-                            custom
-                              ? (custom.price_cents / 100).toFixed(2)
-                              : ""
-                          }
-                          className="w-24"
-                          inputMode="decimal"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <Button type="submit" className="w-full sm:w-auto">
-                Save Pricing
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
         {/* Order History */}
         <Card>
           <CardHeader>

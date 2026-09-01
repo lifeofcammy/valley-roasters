@@ -576,6 +576,74 @@ export async function fetchValleyCatalog(): Promise<SquareCatalogItem[]> {
   });
 }
 
+export type SquareCategoryOption = {
+  id: string;
+  name: string;
+  itemCount: number;
+};
+
+/**
+ * Every Square category that has at least one item enabled at Valley's
+ * location, with item counts — the option list for the admin
+ * "coffee pricing category" dropdown.
+ *
+ * Deliberately uncached (`cache: no-store`): the whole point is that a
+ * category Charlie created in Square a minute ago shows up the moment
+ * she opens the customer page. Admin-only traffic, so the extra Square
+ * round trip costs nothing that matters.
+ */
+export async function fetchValleyCategories(): Promise<SquareCategoryOption[]> {
+  const { locationId } = getConfig();
+
+  // Item pass: count items per reporting category at this location.
+  const countByCategory = new Map<string, number>();
+  let cursor: string | undefined;
+  do {
+    const data = await squareFetch<{
+      items?: SquareCatalogObject[];
+      cursor?: string;
+    }>("/v2/catalog/search-catalog-items", {
+      method: "POST",
+      body: JSON.stringify(
+        cursor
+          ? { enabled_location_ids: [locationId], limit: 100, cursor }
+          : { enabled_location_ids: [locationId], limit: 100 }
+      ),
+    });
+    for (const obj of data.items ?? []) {
+      const catId = obj.item_data?.reporting_category?.id;
+      if (catId) countByCategory.set(catId, (countByCategory.get(catId) ?? 0) + 1);
+    }
+    cursor = data.cursor;
+  } while (cursor);
+
+  // Category pass: resolve names.
+  const nameById = new Map<string, string>();
+  let catCursor: string | undefined;
+  do {
+    const qs = catCursor
+      ? `?types=CATEGORY&cursor=${encodeURIComponent(catCursor)}`
+      : "?types=CATEGORY";
+    const data = await squareFetch<{
+      objects?: SquareCatalogObject[];
+      cursor?: string;
+    }>(`/v2/catalog/list${qs}`);
+    for (const obj of data.objects ?? []) {
+      const nm = obj.category_data?.name;
+      if (obj.id && nm) nameById.set(obj.id, nm);
+    }
+    catCursor = data.cursor;
+  } while (catCursor);
+
+  return Array.from(countByCategory.entries())
+    .map(([id, itemCount]) => ({
+      id,
+      name: nameById.get(id) ?? id,
+      itemCount,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /**
  * Coffee-only slice of the Valley catalog — used by the public wholesale
  * marketing page and the admin products view.

@@ -16,7 +16,6 @@ import {
   DELIVERY_FEE_LABEL,
 } from "@/lib/constants";
 import { getOrderHold, orderHoldMessage } from "@/lib/order-hold";
-import { alwaysChargesDelivery } from "@/lib/account-pricing";
 
 /* ------------------------------------------------------------- */
 /* Zod schema — runtime-validates every field before any write.   */
@@ -242,7 +241,7 @@ export async function POST(request: Request) {
     // distant accounts (Sahara, Shaghf Glendale). Computed server-side so
     // the client can't opt out of it.
     const deliveryFeeCents = calculateDeliveryFeeCents(subtotalCents, {
-      alwaysCharge: alwaysChargesDelivery(profile.square_customer_id),
+      alwaysCharge: Boolean(profile.always_charge_delivery),
     });
     const totalCents = subtotalCents + deliveryFeeCents;
 
