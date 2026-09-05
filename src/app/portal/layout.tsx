@@ -32,9 +32,14 @@ export default async function PortalLayout({
   // link should always show for admins, even when impersonating).
   const { data: actualProfile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, is_approved")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (!actualProfile) redirect("/pending-approval");
+  if (actualProfile.role !== "admin" && !actualProfile.is_approved) {
+    redirect("/pending-approval");
+  }
 
   const displayProfile = effective.profile;
   const isImpersonating = effective.isImpersonating;

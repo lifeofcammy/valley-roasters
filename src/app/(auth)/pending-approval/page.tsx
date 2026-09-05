@@ -1,7 +1,6 @@
 import { Logo } from "@/components/shared/Logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 
 export default function PendingApprovalPage() {
   return (
@@ -28,11 +27,11 @@ export default function PendingApprovalPage() {
                 info@valleyspecialtyroasters.com
               </a>
             </p>
-            <Link href="/login">
+            <form action="/api/auth/signout" method="POST">
               <Button variant="outline" className="mt-4">
-                Back to Login
+                Sign out
               </Button>
-            </Link>
+            </form>
           </CardContent>
         </Card>
       </div>

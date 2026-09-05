@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { getPostLoginPath, safeRedirectPath } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,19 +47,16 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        // Route based on role: admins go to /admin, everyone else to /portal
-        let destination = "/portal/orders";
+        let destination = safeRedirectPath(
+          new URLSearchParams(window.location.search).get("next")
+        );
         if (data.user) {
           const { data: profile } = await supabase
             .from("profiles")
             .select("role, is_approved")
             .eq("id", data.user.id)
-            .single();
-          if (profile?.role === "admin") {
-            destination = "/admin";
-          } else if (profile && !profile.is_approved) {
-            destination = "/pending-approval";
-          }
+            .maybeSingle();
+          destination = getPostLoginPath(profile, destination);
         }
         router.push(destination);
         router.refresh();
