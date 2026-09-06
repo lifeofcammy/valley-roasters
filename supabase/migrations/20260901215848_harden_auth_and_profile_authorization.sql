@@ -1,10 +1,11 @@
 -- Harden authentication support functions and prevent customers from
 -- promoting their own profile to an approved or admin account.
 --
--- NOT YET APPLIED. Run in the Supabase dashboard SQL editor as one
--- transaction (the begin/commit below). After it succeeds, change this
--- header to "APPLIED <date> via the dashboard SQL editor" like
--- 20260729_account_pricing.sql.
+-- APPLIED. Verified live 2026-09-05 by signing in as a throwaway customer
+-- against production: role, is_approved and square_price_category_id writes
+-- on their own row were all rejected with this file's 42501 message, while
+-- name/phone/company self-edits succeeded and only their own row was
+-- readable. Re-running is a no-op; every step below is idempotent.
 --
 -- Defensive revision (2026-09-05). This file's preconditions live only in
 -- the production database, not in repo migrations, so every step checks
