@@ -1,7 +1,9 @@
 -- Let the 4-status admin workflow write to orders.status.
 --
--- NOT YET APPLIED. Paste the whole file into the Supabase dashboard SQL
--- editor and run it once. Then change this header to "APPLIED <date>".
+-- APPLIED 2026-09-14 via the dashboard SQL editor. Verified afterwards
+-- against production: an INSERT with status 'received' (HTTP 400 before)
+-- now succeeds, and UPDATEs to in_process / shipped / rejected all pass.
+-- Re-running is a harmless no-op.
 --
 -- Why: the app moved to received / in_process / shipped / rejected on
 -- 2026-04-23 (commit 540a462), but the table's check constraint was never
