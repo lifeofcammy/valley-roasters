@@ -37,6 +37,10 @@ const cartItemSchema = z.object({
     })
     .nullable()
     .optional(),
+  // How many sizes the item offers in Square. When more than one, the
+  // size is written into the Square line-item name so the invoice says
+  // "Ethiopia - 5lb", not just "Ethiopia".
+  size_count: z.number().int().min(1).max(50).optional(),
 });
 
 const recurringSchema = z
@@ -342,7 +346,10 @@ export async function POST(request: Request) {
         // catalog-linked ones.
         const squareLineItems: CreateOrderLineItem[] = validatedItems.map(
           (it) => ({
-            name: it.product_name,
+            name:
+              (it.size_count ?? 1) > 1
+                ? `${it.product_name} - ${it.size}`
+                : it.product_name,
             quantity: it.quantity,
             unit_price_cents: it.unit_price_cents,
             ...(it.grind?.name ? { note: `Grind: ${it.grind.name}` } : {}),

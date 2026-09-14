@@ -39,6 +39,64 @@ interface CartItem {
   grind?: { id: string; name: string } | null;
   /** All grind choices for this item, so the cart can offer a re-pick. */
   grind_options?: { id: string; name: string }[];
+  /** Square catalog item this row came from (catalog deep-links only). */
+  catalog_item_id?: string;
+  /** Square variation currently selected — keys the size picker. */
+  size_variation_id?: string;
+  /**
+   * The item's real sizes from Square, each with its own price. The cart
+   * offers exactly these — nothing else. Absent on rows pre-filled from a
+   * past order, which just display the size they were bought in.
+   */
+  size_options?: { id: string; name: string; price_cents: number }[];
+}
+
+/**
+ * The cart lives in localStorage, keyed per user, so it survives the
+ * round trip to the catalog (which is how buyers add every item), a
+ * refresh, or closing the tab. Cleared once an order is placed.
+ */
+const CART_STORAGE_PREFIX = "vsr-cart:";
+
+function readStoredCart(userId: string): CartItem[] {
+  try {
+    const raw = window.localStorage.getItem(CART_STORAGE_PREFIX + userId);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCart(userId: string, cart: CartItem[]) {
+  try {
+    if (cart.length === 0) {
+      window.localStorage.removeItem(CART_STORAGE_PREFIX + userId);
+    } else {
+      window.localStorage.setItem(
+        CART_STORAGE_PREFIX + userId,
+        JSON.stringify(cart)
+      );
+    }
+  } catch {
+    // Storage unavailable (private mode, quota) — the cart still works
+    // for this visit, it just won't persist.
+  }
+}
+
+/** Add a catalog row, bumping quantity if the same item/size/grind is already there. */
+function mergeIntoCart(cart: CartItem[], row: CartItem): CartItem[] {
+  const i = cart.findIndex(
+    (c) =>
+      c.catalog_item_id !== undefined &&
+      c.catalog_item_id === row.catalog_item_id &&
+      c.size === row.size &&
+      (c.grind?.id ?? null) === (row.grind?.id ?? null)
+  );
+  if (i === -1) return [...cart, row];
+  return cart.map((c, j) =>
+    j === i ? { ...c, quantity: c.quantity + row.quantity } : c
+  );
 }
 
 type Frequency = "weekly" | "biweekly" | "monthly";
@@ -63,9 +121,8 @@ export default function ReorderPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const fromOrderId = searchParams.get("from");
-  // Deep-link from /portal/catalog — pre-fill cart with one SKU.
-  // `sku` is the Square catalog item id, `variation` is optional
-  // (falls back to "1lb" if missing).
+  // Deep-link from /portal/catalog — add one SKU to the cart. `sku` is the
+  // Square catalog item id; `grind` is the chosen grind option, optional.
   const skuParam = searchParams.get("sku");
   const grindParam = searchParams.get("grind");
   const supabase = createClient();
@@ -73,6 +130,14 @@ export default function ReorderPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  // Remember that this visit began as a reorder even after the ?from=
+  // param is consumed off the URL.
+  const [startedFromOrder] = useState(() => Boolean(fromOrderId));
+  // What the buyer is currently typing into a Qty box, by row. Lets them
+  // clear the field and type a fresh number; the stored quantity only
+  // changes once the text is a valid whole number.
+  const [qtyDraft, setQtyDraft] = useState<Record<number, string>>({});
   const [placing, setPlacing] = useState(false);
   // Stable per-page-load nonce for order idempotency.
   const [clientNonce] = useState(
@@ -92,6 +157,10 @@ export default function ReorderPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      setUserId(user.id);
+
+      // Start from whatever they had in the cart last time.
+      let nextCart: CartItem[] = readStoredCart(user.id);
 
       // Buyer rules: credit hold + delivery policy. Surfaces an
       // outstanding invoice before they bother building a cart, and lets
@@ -132,24 +201,23 @@ export default function ReorderPage() {
               quantity: number;
               unit_price_cents: number;
             }>;
-            setCart(
-              items.map((it) => ({
-                product_id: null,
-                product_name: it.name,
-                size: it.variation ?? "1lb",
-                quantity: it.quantity,
-                unit_price_cents: it.unit_price_cents,
-              }))
-            );
+            // A reorder deliberately replaces the cart with that order.
+            nextCart = items.map((it) => ({
+              product_id: null,
+              product_name: it.name,
+              size: it.variation ?? "Regular",
+              quantity: it.quantity,
+              unit_price_cents: it.unit_price_cents,
+            }));
           }
         } catch {
           // Pre-fill is best-effort; user can still build cart manually
         }
       }
 
-      // Deep-link from catalog — pre-fill with one SKU. We fetch the
-      // item from Square via the catalog API to resolve its name and
-      // first-variation price on the fly.
+      // Deep-link from catalog — add one SKU to whatever is already in the
+      // cart. We fetch the item from Square via the catalog API to resolve
+      // its name, sizes and first-variation price on the fly.
       if (skuParam && !fromOrderId) {
         try {
           const res = await fetch(
@@ -173,22 +241,27 @@ export default function ReorderPage() {
                   grindOptions.find((g) => g.id === grindParam) ??
                   grindOptions[0] ??
                   null;
-                setCart([
-                  {
-                    product_id: null,
-                    product_name: item.name,
-                    size: first.name || "1lb",
-                    quantity: 1,
-                    unit_price_cents: first.price_cents,
-                    grind: chosen
-                      ? { id: chosen.id, name: chosen.name }
-                      : null,
-                    grind_options: grindOptions.map((g) => ({
-                      id: g.id,
-                      name: g.name,
-                    })),
-                  },
-                ]);
+                nextCart = mergeIntoCart(nextCart, {
+                  product_id: null,
+                  catalog_item_id: skuParam,
+                  product_name: item.name,
+                  size: first.name || "Regular",
+                  size_variation_id: first.id,
+                  quantity: 1,
+                  unit_price_cents: first.price_cents,
+                  grind: chosen
+                    ? { id: chosen.id, name: chosen.name }
+                    : null,
+                  grind_options: grindOptions.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                  })),
+                  size_options: item.variations.map((v) => ({
+                    id: v.id,
+                    name: v.name,
+                    price_cents: v.price_cents,
+                  })),
+                });
               }
             }
           }
@@ -197,11 +270,21 @@ export default function ReorderPage() {
         }
       }
 
+      setCart(nextCart);
+      // The deep-link has been consumed — take it off the URL so a refresh
+      // or the Back button doesn't add the item a second time.
+      if (fromOrderId || skuParam) router.replace("/portal/reorder");
       setLoading(false);
     }
 
     loadData();
-  }, [fromOrderId, skuParam, grindParam]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Runs once per visit; the params are read at that moment.
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (loading || !userId) return;
+    writeStoredCart(userId, cart);
+  }, [cart, loading, userId]);
 
   function updateCartItem(index: number, updates: Partial<CartItem>) {
     setCart((prev) =>
@@ -211,6 +294,7 @@ export default function ReorderPage() {
 
   function removeCartItem(index: number) {
     setCart((prev) => prev.filter((_, i) => i !== index));
+    setQtyDraft({});
   }
 
   const subtotal = cart.reduce(
@@ -246,7 +330,15 @@ export default function ReorderPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cart,
+          items: cart.map((it) => ({
+            product_id: it.product_id,
+            product_name: it.product_name,
+            size: it.size,
+            quantity: it.quantity,
+            unit_price_cents: it.unit_price_cents,
+            grind: it.grind ?? null,
+            size_count: it.size_options?.length ?? 1,
+          })),
           client_nonce: clientNonce,
           recurring: makeRecurring
             ? { frequency, label: cart[0]?.product_name }
@@ -257,6 +349,7 @@ export default function ReorderPage() {
       const data = await res.json();
 
       if (res.ok) {
+        if (userId) writeStoredCart(userId, []);
         if (makeRecurring) {
           if (data.subscriptionError) {
             toast.error(
@@ -317,10 +410,10 @@ export default function ReorderPage() {
     <div>
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold">
-          {fromOrderId ? "Reorder" : "New Order"}
+          {startedFromOrder ? "Reorder" : "New Order"}
         </h1>
         <p className="text-muted-foreground mt-1">
-          {fromOrderId
+          {startedFromOrder
             ? "Your previous order has been pre-filled. Adjust quantities as needed."
             : "Select products and quantities to place an order."}
         </p>
@@ -392,12 +485,11 @@ export default function ReorderPage() {
             </Card>
           ) : (
             cart.map((item, index) => {
-              // Sizes come from the item itself (Square variation names).
-              // Include the current value so deep-linked items render
-              // correctly, plus the common bag sizes for legacy rows.
-              const sizeOptions = Array.from(
-                new Set([item.size, "1lb", "5lb", "10lb"].filter(Boolean))
-              );
+              // Only offer a size picker when Square actually defines more
+              // than one size for this item; a single-size item (most food)
+              // just shows the size it comes in.
+              const sizeOptions = item.size_options ?? [];
+              const showSizePicker = sizeOptions.length > 1;
               return (
                 <Card key={`${item.product_id ?? item.product_name}-${index}`}>
                   <CardContent className="p-4">
@@ -436,23 +528,31 @@ export default function ReorderPage() {
                           )}
                       </div>
 
-                      <Select
-                        value={item.size}
-                        onValueChange={(v) =>
-                          updateCartItem(index, { size: v ?? item.size })
-                        }
-                      >
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sizeOptions.map((size) => (
-                            <SelectItem key={size} value={size}>
-                              {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {showSizePicker && (
+                        <Select
+                          value={item.size_variation_id ?? ""}
+                          onValueChange={(v) => {
+                            const opt = sizeOptions.find((o) => o.id === v);
+                            if (!opt) return;
+                            updateCartItem(index, {
+                              size: opt.name,
+                              size_variation_id: opt.id,
+                              unit_price_cents: opt.price_cents,
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sizeOptions.map((o) => (
+                              <SelectItem key={o.id} value={o.id}>
+                                {o.name} · ${(o.price_cents / 100).toFixed(2)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
 
                       <div className="flex items-center gap-2">
                         <label className="text-sm text-muted-foreground">
@@ -460,12 +560,26 @@ export default function ReorderPage() {
                         </label>
                         <Input
                           type="number"
+                          inputMode="numeric"
                           min={1}
                           className="w-20"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateCartItem(index, {
-                              quantity: parseInt(e.target.value) || 1,
+                          value={qtyDraft[index] ?? String(item.quantity)}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setQtyDraft((d) => ({ ...d, [index]: raw }));
+                            const n = parseInt(raw, 10);
+                            if (Number.isFinite(n) && n >= 1) {
+                              updateCartItem(index, { quantity: n });
+                            }
+                          }}
+                          onBlur={() =>
+                            // Drop the draft; an empty or zero box snaps
+                            // back to the last valid quantity.
+                            setQtyDraft((d) => {
+                              const next = { ...d };
+                              delete next[index];
+                              return next;
                             })
                           }
                         />
