@@ -272,6 +272,7 @@ export default function ReorderPage() {
               variation: string | null;
               quantity: number;
               unit_price_cents: number;
+              grind: { id: string; name: string; price_cents: number } | null;
             }>;
             // A reorder deliberately replaces the cart with that order.
             nextCart = items.map((it) => ({
@@ -280,6 +281,7 @@ export default function ReorderPage() {
               size: it.variation ?? "Regular",
               quantity: it.quantity,
               unit_price_cents: it.unit_price_cents,
+              grind: it.grind,
             }));
           }
         } catch {

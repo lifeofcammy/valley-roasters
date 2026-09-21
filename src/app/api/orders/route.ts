@@ -356,8 +356,17 @@ export async function POST(request: Request) {
         product_name: item.product_name,
         quantity: item.quantity,
         size: item.size,
-        unit_price_cents: item.unit_price_cents,
+        // Bean price on the row; the grind upcharge lives in `grind` and
+        // is already counted in total_cents.
+        unit_price_cents: item.base_price_cents,
         total_cents: item.unit_price_cents * item.quantity,
+        grind: item.grind
+          ? {
+              id: item.grind.id,
+              name: item.grind.name,
+              price_cents: item.grind_price_cents,
+            }
+          : null,
       }))
     );
 

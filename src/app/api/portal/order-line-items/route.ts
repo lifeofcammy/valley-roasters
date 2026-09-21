@@ -3,9 +3,32 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveProfile } from "@/lib/impersonate";
 import {
   fetchOrderForCustomer,
+  fetchValleyCatalog,
   isSquareConfigured,
+  lineItemGrindName,
   moneyToDollars,
+  type SquareGrindOption,
 } from "@/lib/square/client";
+
+/**
+ * Square-native lines only name the grind ("Grind: Cold Brew"), so map
+ * the name back to a live catalog option to recover its id and upcharge.
+ * Best effort: with no match the line is pre-filled without a grind and
+ * the buyer picks again.
+ */
+async function grindOptionsByName(): Promise<Map<string, SquareGrindOption>> {
+  const byName = new Map<string, SquareGrindOption>();
+  try {
+    for (const item of await fetchValleyCatalog()) {
+      for (const g of item.grind_options) {
+        if (!byName.has(g.name.toLowerCase())) byName.set(g.name.toLowerCase(), g);
+      }
+    }
+  } catch {
+    // Catalog unreachable — prefill still works, just without grinds.
+  }
+  return byName;
+}
 
 /**
  * Fetch line items for a past order so the reorder page can pre-fill
@@ -44,13 +67,23 @@ export async function GET(request: Request) {
           { status: 404 }
         );
       }
-      const items = (order.line_items ?? []).map((li, idx) => ({
-        id: li.uid ?? `line-${idx}`,
-        name: li.name ?? "Item",
-        variation: li.variation_name ?? null,
-        quantity: parseFloat(li.quantity ?? "0") || 0,
-        unit_price_cents: Math.round(moneyToDollars(li.base_price_money) * 100),
-      }));
+      const grinds = await grindOptionsByName();
+      const items = (order.line_items ?? []).map((li, idx) => {
+        const grindName = lineItemGrindName(li);
+        const grind = grindName
+          ? grinds.get(grindName.toLowerCase()) ?? null
+          : null;
+        return {
+          id: li.uid ?? `line-${idx}`,
+          name: li.name ?? "Item",
+          variation: li.variation_name ?? null,
+          quantity: parseFloat(li.quantity ?? "0") || 0,
+          unit_price_cents: Math.round(moneyToDollars(li.base_price_money) * 100),
+          grind: grind
+            ? { id: grind.id, name: grind.name, price_cents: grind.price_cents }
+            : null,
+        };
+      });
       return NextResponse.json({ source: "square", items });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Square error";
@@ -73,7 +106,7 @@ export async function GET(request: Request) {
   }
   const { data: rows, error } = await adminSupabase
     .from("order_items")
-    .select("id, product_name, size, quantity, unit_price_cents")
+    .select("id, product_name, size, quantity, unit_price_cents, grind")
     .eq("order_id", orderId);
 
   if (error) {
@@ -86,6 +119,9 @@ export async function GET(request: Request) {
     variation: r.size ?? null,
     quantity: r.quantity,
     unit_price_cents: r.unit_price_cents,
+    grind:
+      (r.grind as { id: string; name: string; price_cents: number } | null) ??
+      null,
   }));
   return NextResponse.json({ source: "supabase", items });
 }

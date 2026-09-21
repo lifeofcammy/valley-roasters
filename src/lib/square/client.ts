@@ -71,12 +71,34 @@ export type SquareLineItem = {
   quantity?: string;
   variation_name?: string;
   note?: string;
+  modifiers?: Array<{
+    uid?: string;
+    name?: string;
+    catalog_object_id?: string;
+    base_price_money?: SquareMoney;
+    total_price_money?: SquareMoney;
+  }>;
   base_price_money?: SquareMoney;
   total_money?: SquareMoney;
   gross_sales_money?: SquareMoney;
   total_tax_money?: SquareMoney;
   total_discount_money?: SquareMoney;
 };
+
+/**
+ * The grind a Square line was ordered with, or null. Portal orders carry
+ * it as a "Grind: X" modifier; orders from before 2026-09-21 carried the
+ * same text as the line note. Either way the buyer-facing name comes back
+ * without the prefix.
+ */
+export function lineItemGrindName(li: SquareLineItem): string | null {
+  const prefix = /^grind:\s*/i;
+  for (const m of li.modifiers ?? []) {
+    if (m.name && prefix.test(m.name)) return m.name.replace(prefix, "").trim();
+  }
+  if (li.note && prefix.test(li.note)) return li.note.replace(prefix, "").trim();
+  return null;
+}
 
 export type SquareOrder = {
   id: string;

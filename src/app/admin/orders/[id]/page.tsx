@@ -45,6 +45,14 @@ async function assertAdmin() {
   if (p?.role !== "admin") throw new Error("Forbidden");
 }
 
+/** "Cold Brew (+$1.25)", "Whole Bean", or "—" for items that aren't ground. */
+function grindLabel(grind: { name: string; price_cents: number } | null): string {
+  if (!grind) return "—";
+  return grind.price_cents > 0
+    ? `${grind.name} (+$${(grind.price_cents / 100).toFixed(2)})`
+    : grind.name;
+}
+
 export default async function AdminOrderDetailPage({
   params,
 }: {
@@ -228,6 +236,7 @@ export default async function AdminOrderDetailPage({
                     quantity: number;
                     unit_price_cents: number;
                     total_cents: number;
+                    grind: { name: string; price_cents: number } | null;
                   }) => (
                     <div
                       key={item.id}
@@ -235,7 +244,7 @@ export default async function AdminOrderDetailPage({
                     >
                       <p className="font-medium">{item.product_name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {item.size}
+                        {grindLabel(item.grind)}
                       </p>
                       <div className="flex items-center justify-between mt-2 text-sm">
                         <span className="text-muted-foreground">
@@ -257,7 +266,7 @@ export default async function AdminOrderDetailPage({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead>Size</TableHead>
+                      <TableHead>Grind</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
@@ -272,12 +281,13 @@ export default async function AdminOrderDetailPage({
                         quantity: number;
                         unit_price_cents: number;
                         total_cents: number;
+                        grind: { name: string; price_cents: number } | null;
                       }) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">
                             {item.product_name}
                           </TableCell>
-                          <TableCell>{item.size}</TableCell>
+                          <TableCell>{grindLabel(item.grind)}</TableCell>
                           <TableCell className="text-right">
                             {item.quantity}
                           </TableCell>

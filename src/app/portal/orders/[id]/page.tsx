@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import {
   fetchOrderForCustomer,
   isSquareConfigured,
+  lineItemGrindName,
   moneyToDollars,
   squareStateToStatus,
 } from "@/lib/square/client";
@@ -26,7 +27,8 @@ import {
 type LineItem = {
   id: string;
   name: string;
-  variation_name?: string;
+  /** Grind the coffee was ordered with; undefined for food and un-ground items. */
+  grind?: string;
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
@@ -116,7 +118,7 @@ export default async function OrderDetailPage({
             return {
               id: li.uid ?? `line-${idx}`,
               name: li.name ?? "Item",
-              variation_name: li.variation_name,
+              grind: lineItemGrindName(li) ?? undefined,
               quantity: qty,
               unit_price_cents: Math.round(unit * 100),
               total_cents: Math.round(total * 100),
@@ -149,6 +151,7 @@ export default async function OrderDetailPage({
       quantity: number;
       unit_price_cents: number;
       total_cents: number;
+      grind: { name: string } | null;
     };
 
     order = {
@@ -165,7 +168,7 @@ export default async function OrderDetailPage({
       items: ((data.order_items as RawItem[] | null) ?? []).map((it) => ({
         id: String(it.id),
         name: it.product_name,
-        variation_name: it.size,
+        grind: it.grind?.name,
         quantity: it.quantity,
         unit_price_cents: it.unit_price_cents,
         total_cents: it.total_cents,
@@ -248,9 +251,9 @@ export default async function OrderDetailPage({
             {order.items.map((item) => (
               <div key={item.id} className="border rounded-md p-3 bg-muted/30">
                 <p className="font-medium">{item.name}</p>
-                {item.variation_name && (
+                {item.grind && (
                   <p className="text-sm text-muted-foreground">
-                    {item.variation_name}
+                    {item.grind}
                   </p>
                 )}
                 <div className="flex items-center justify-between mt-2 text-sm">
@@ -271,7 +274,7 @@ export default async function OrderDetailPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead>Variation</TableHead>
+                  <TableHead>Grind</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -281,7 +284,7 @@ export default async function OrderDetailPage({
                 {order.items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.variation_name ?? ""}</TableCell>
+                    <TableCell>{item.grind ?? "—"}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
                     <TableCell className="text-right">
                       {formatMoney(item.unit_price_cents)}
