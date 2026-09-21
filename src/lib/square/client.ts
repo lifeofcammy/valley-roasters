@@ -747,6 +747,12 @@ export type CreateOrderLineItem = {
   quantity: number;
   unit_price_cents: number;
   note?: string;
+  /**
+   * Ad-hoc modifiers (e.g. the grind). Square adds each modifier's price
+   * to the line and prints it under the item on the invoice, so the buyer
+   * sees "Cold Brew +$1.25" rather than a silently higher unit price.
+   */
+  modifiers?: { name: string; price_cents: number }[];
 };
 
 export type CreatedSquareOrderResult = {
@@ -780,6 +786,17 @@ export async function createSquareOrder(args: {
           currency: "USD",
         },
         ...(li.note ? { note: li.note } : {}),
+        ...(li.modifiers && li.modifiers.length > 0
+          ? {
+              modifiers: li.modifiers.map((m) => ({
+                name: m.name,
+                base_price_money: {
+                  amount: Math.round(m.price_cents),
+                  currency: "USD",
+                },
+              })),
+            }
+          : {}),
       })),
       state: "OPEN",
       ...(args.note ? { note: args.note } : {}),

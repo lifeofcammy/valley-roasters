@@ -35,10 +35,15 @@ interface CartItem {
   size: string;
   quantity: number;
   unit_price_cents: number;
-  /** Chosen grind (a Square modifier option), when the item offers one. */
-  grind?: { id: string; name: string } | null;
+  /**
+   * Chosen grind (a Square modifier option), when the item offers one.
+   * `price_cents` is its upcharge — $1.25 for a ground coffee at Valley —
+   * and is added on top of the unit price. The server re-checks it
+   * against Square before invoicing.
+   */
+  grind?: { id: string; name: string; price_cents: number } | null;
   /** All grind choices for this item, so the cart can offer a re-pick. */
-  grind_options?: { id: string; name: string }[];
+  grind_options?: { id: string; name: string; price_cents: number }[];
   /** Square catalog item this row came from (catalog deep-links only). */
   catalog_item_id?: string;
   /** Square variation currently selected — keys the size picker. */
@@ -82,6 +87,11 @@ function writeStoredCart(userId: string, cart: CartItem[]) {
     // Storage unavailable (private mode, quota) — the cart still works
     // for this visit, it just won't persist.
   }
+}
+
+/** Per-unit price the buyer actually pays: base price plus any grind upcharge. */
+function unitTotalCents(item: CartItem): number {
+  return item.unit_price_cents + (item.grind?.price_cents ?? 0);
 }
 
 /** Add a catalog row, bumping quantity if the same item/size/grind is already there. */
@@ -230,7 +240,11 @@ export default function ReorderPage() {
               const item = data.item as {
                 name: string;
                 variations: Array<{ id: string; name: string; price_cents: number }>;
-                grind_options?: Array<{ id: string; name: string }>;
+                grind_options?: Array<{
+                  id: string;
+                  name: string;
+                  price_cents: number;
+                }>;
               };
               const first = item.variations[0];
               if (first) {
@@ -250,11 +264,16 @@ export default function ReorderPage() {
                   quantity: 1,
                   unit_price_cents: first.price_cents,
                   grind: chosen
-                    ? { id: chosen.id, name: chosen.name }
+                    ? {
+                        id: chosen.id,
+                        name: chosen.name,
+                        price_cents: chosen.price_cents ?? 0,
+                      }
                     : null,
                   grind_options: grindOptions.map((g) => ({
                     id: g.id,
                     name: g.name,
+                    price_cents: g.price_cents ?? 0,
                   })),
                   size_options: item.variations.map((v) => ({
                     id: v.id,
@@ -298,7 +317,7 @@ export default function ReorderPage() {
   }
 
   const subtotal = cart.reduce(
-    (sum, item) => sum + item.unit_price_cents * item.quantity,
+    (sum, item) => sum + unitTotalCents(item) * item.quantity,
     0
   );
   const deliveryFee = calculateDeliveryFeeCents(subtotal, {
@@ -336,7 +355,7 @@ export default function ReorderPage() {
             size: it.size,
             quantity: it.quantity,
             unit_price_cents: it.unit_price_cents,
-            grind: it.grind ?? null,
+            grind: it.grind ? { id: it.grind.id, name: it.grind.name } : null,
             size_count: it.size_options?.length ?? 1,
           })),
           client_nonce: clientNonce,
@@ -501,6 +520,13 @@ export default function ReorderPage() {
                         <p className="text-sm text-muted-foreground">
                           ${(item.unit_price_cents / 100).toFixed(2)} /{" "}
                           {item.size || "unit"}
+                          {item.grind && item.grind.price_cents > 0 && (
+                            <>
+                              {" "}
+                              + ${(item.grind.price_cents / 100).toFixed(2)}{" "}
+                              {item.grind.name} grind
+                            </>
+                          )}
                         </p>
                         {item.grind_options &&
                           item.grind_options.length > 0 && (
@@ -513,7 +539,11 @@ export default function ReorderPage() {
                                 );
                                 updateCartItem(index, {
                                   grind: opt
-                                    ? { id: opt.id, name: opt.name }
+                                    ? {
+                                        id: opt.id,
+                                        name: opt.name,
+                                        price_cents: opt.price_cents ?? 0,
+                                      }
                                     : null,
                                 });
                               }}
@@ -522,6 +552,9 @@ export default function ReorderPage() {
                               {item.grind_options.map((g) => (
                                 <option key={g.id} value={g.id}>
                                   {g.name}
+                                  {g.price_cents > 0
+                                    ? ` (+$${(g.price_cents / 100).toFixed(2)})`
+                                    : ""}
                                 </option>
                               ))}
                             </select>
@@ -587,7 +620,7 @@ export default function ReorderPage() {
 
                       <p className="font-semibold w-24 text-right">
                         $
-                        {((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
+                        {((unitTotalCents(item) * item.quantity) / 100).toFixed(2)}
                       </p>
 
                       <Button
@@ -629,7 +662,7 @@ export default function ReorderPage() {
                     </span>
                     <span className="font-medium">
                       $
-                      {((item.unit_price_cents * item.quantity) / 100).toFixed(2)}
+                      {((unitTotalCents(item) * item.quantity) / 100).toFixed(2)}
                     </span>
                   </div>
                 ))}

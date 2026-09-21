@@ -8,6 +8,7 @@ import {
   createSquareOrder,
   createSquareSubscription,
   createSquareSubscriptionPlan,
+  fetchValleyCatalog,
   isSquareConfigured,
   type CreateOrderLineItem,
 } from "@/lib/square/client";
@@ -27,9 +28,9 @@ const cartItemSchema = z.object({
   size: z.string().min(1).max(50),
   quantity: z.number().int().positive().max(10000),
   unit_price_cents: z.number().int().nonnegative().max(1_000_000),
-  // Chosen grind (a Square modifier option). Display-only — it rides
-  // along to Square on the line-item note so the roastery knows how to
-  // grind, and never affects price.
+  // Chosen grind (a Square modifier option). Its upcharge is looked up
+  // from Square's catalog server-side — the client never sets it — and
+  // goes to Square as a line-item modifier so the invoice itemises it.
   grind: z
     .object({
       id: z.string().max(64),
@@ -58,6 +59,11 @@ const orderRequestSchema = z.object({
 });
 
 type CartItem = z.infer<typeof cartItemSchema>;
+/** A cart item after server-side pricing: unit price includes the grind. */
+type PricedItem = CartItem & {
+  base_price_cents: number;
+  grind_price_cents: number;
+};
 type Frequency = "weekly" | "biweekly" | "monthly";
 
 /* ------------------------------------------------------------- */
@@ -215,10 +221,31 @@ export async function POST(request: Request) {
       );
     }
 
+    // Grind upcharges come from Square, not the request. Every grind
+    // option across the catalog has a globally unique modifier id, so one
+    // flat map covers every item.
+    const grindPriceById = new Map<string, number>();
+    if (items.some((it) => it.grind) && isSquareConfigured()) {
+      try {
+        for (const catalogItem of await fetchValleyCatalog()) {
+          for (const g of catalogItem.grind_options) {
+            grindPriceById.set(g.id, g.price_cents);
+          }
+        }
+      } catch (err) {
+        console.error("grind price lookup failed:", err);
+        return NextResponse.json(
+          { error: "Could not confirm grind pricing. Please try again." },
+          { status: 502 }
+        );
+      }
+    }
+
     // Validate Supabase-product prices server-side via RPC.
     // Pass-through for Square items (product_id null).
-    const validatedItems: CartItem[] = [];
+    const validatedItems: PricedItem[] = [];
     for (const item of items) {
+      let basePrice = item.unit_price_cents;
       if (item.product_id) {
         const { data: effectivePrice } = await adminSupabase.rpc(
           "get_effective_price",
@@ -230,10 +257,29 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        validatedItems.push({ ...item, unit_price_cents: effectivePrice });
-      } else {
-        validatedItems.push(item);
+        basePrice = effectivePrice;
       }
+
+      let grindPrice = 0;
+      if (item.grind) {
+        const known = grindPriceById.get(item.grind.id);
+        if (known === undefined) {
+          return NextResponse.json(
+            {
+              error: `The "${item.grind.name}" grind is no longer available for ${item.product_name}. Please re-add the item from the catalog.`,
+            },
+            { status: 400 }
+          );
+        }
+        grindPrice = known;
+      }
+
+      validatedItems.push({
+        ...item,
+        base_price_cents: basePrice,
+        grind_price_cents: grindPrice,
+        unit_price_cents: basePrice + grindPrice,
+      });
     }
 
     const subtotalCents = validatedItems.reduce(
@@ -340,10 +386,9 @@ export async function POST(request: Request) {
         // Assemble Square line items. Append a "Delivery" line only when
         // the fee applies — orders at/over the free-shipping threshold
         // don't see it at all.
-        // The chosen grind rides along as a line-item note so the roastery
-        // sees it on the Square order and invoice. Sent as a note rather
-        // than a Square modifier because these are ad-hoc line items, not
-        // catalog-linked ones.
+        // The grind goes on as an ad-hoc modifier: Square adds its price
+        // to the line and prints it under the item on the invoice, so the
+        // base price and the upcharge are both visible to the buyer.
         const squareLineItems: CreateOrderLineItem[] = validatedItems.map(
           (it) => ({
             name:
@@ -351,8 +396,17 @@ export async function POST(request: Request) {
                 ? `${it.product_name} - ${it.size}`
                 : it.product_name,
             quantity: it.quantity,
-            unit_price_cents: it.unit_price_cents,
-            ...(it.grind?.name ? { note: `Grind: ${it.grind.name}` } : {}),
+            unit_price_cents: it.base_price_cents,
+            ...(it.grind
+              ? {
+                  modifiers: [
+                    {
+                      name: `Grind: ${it.grind.name}`,
+                      price_cents: it.grind_price_cents,
+                    },
+                  ],
+                }
+              : {}),
           })
         );
         if (deliveryFeeCents > 0) {
