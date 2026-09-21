@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isImpersonatingFromCookie } from "@/lib/impersonate";
+import { getEffectiveProfile } from "@/lib/impersonate";
 import {
   createSquareInvoice,
   createSquareOrder,
@@ -132,25 +131,17 @@ async function getAutoPublishInvoices(): Promise<boolean> {
 
 export async function POST(request: Request) {
   try {
-    // Refuse all order placement while an admin is in "view as customer"
-    // mode. The portal UI also disables the Place Order button, but
-    // belt-and-braces — never let an admin accidentally place a real
-    // order against another company's account.
-    if (await isImpersonatingFromCookie()) {
-      return NextResponse.json(
-        { error: "Disabled while impersonating" },
-        { status: 403 }
-      );
-    }
-
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    // The order belongs to the EFFECTIVE customer: the signed-in buyer,
+    // or — when an admin is in "view as customer" mode — the customer
+    // being viewed. That lets staff enter an order on a customer's
+    // behalf (a phone order, a test) and have it land under that
+    // customer's account and Square record, exactly as if they had
+    // placed it themselves.
+    const effective = await getEffectiveProfile();
+    if (!effective.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const customerId = effective.userId;
 
     // Parse + validate body
     let body: z.infer<typeof orderRequestSchema>;
@@ -169,11 +160,7 @@ export async function POST(request: Request) {
     const recurring = body.recurring ?? null;
     const clientNonce = body.client_nonce;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+    const profile = effective.profile;
 
     if (!profile || !profile.is_approved) {
       return NextResponse.json(
@@ -189,7 +176,7 @@ export async function POST(request: Request) {
     const { data: existing } = await adminSupabase
       .from("orders")
       .select("id, square_order_id, square_invoice_id, square_invoice_public_url")
-      .eq("profile_id", user.id)
+      .eq("profile_id", customerId)
       .eq("client_nonce", clientNonce)
       .maybeSingle();
     if (existing) {
@@ -249,7 +236,7 @@ export async function POST(request: Request) {
       if (item.product_id) {
         const { data: effectivePrice } = await adminSupabase.rpc(
           "get_effective_price",
-          { p_profile_id: user.id, p_product_id: item.product_id }
+          { p_profile_id: customerId, p_product_id: item.product_id }
         );
         if (effectivePrice === null || effectivePrice === undefined) {
           return NextResponse.json(
@@ -300,7 +287,7 @@ export async function POST(request: Request) {
     const { data: order, error: orderError } = await adminSupabase
       .from("orders")
       .insert({
-        profile_id: user.id,
+        profile_id: customerId,
         status: "received",
         subtotal_cents: subtotalCents,
         tax_cents: 0,
@@ -327,7 +314,7 @@ export async function POST(request: Request) {
           .select(
             "id, square_order_id, square_invoice_id, square_invoice_public_url"
           )
-          .eq("profile_id", user.id)
+          .eq("profile_id", customerId)
           .eq("client_nonce", clientNonce)
           .maybeSingle();
         if (existing) {
@@ -523,7 +510,7 @@ export async function POST(request: Request) {
       const { data: subRow, error: mirrorError } = await adminSupabase
         .from("order_subscriptions")
         .insert({
-          profile_id: user.id,
+          profile_id: customerId,
           label: recurring.label ?? null,
           items: validatedItems,
           frequency: recurring.frequency,

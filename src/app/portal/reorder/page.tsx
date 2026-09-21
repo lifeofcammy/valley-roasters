@@ -195,7 +195,7 @@ export default function ReorderPage() {
   const skuParam = searchParams.get("sku");
   const grindParam = searchParams.get("grind");
   const supabase = createClient();
-  const { isImpersonating } = useImpersonation();
+  const { isImpersonating, impersonatedName } = useImpersonation();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,10 +394,6 @@ export default function ReorderPage() {
     : Math.max(0, DELIVERY_FEE_FREE_THRESHOLD_CENTS - subtotal);
 
   async function handlePlaceOrder() {
-    if (isImpersonating) {
-      toast.error("Disabled in admin preview mode.");
-      return;
-    }
     if (cart.length === 0) {
       toast.error("Add items to your cart first.");
       return;
@@ -830,10 +826,7 @@ export default function ReorderPage() {
                 className="w-full"
                 size="lg"
                 disabled={
-                  cart.length === 0 ||
-                  placing ||
-                  isImpersonating ||
-                  Boolean(hold?.blocked)
+                  cart.length === 0 || placing || Boolean(hold?.blocked)
                 }
                 onClick={handlePlaceOrder}
               >
@@ -856,8 +849,10 @@ export default function ReorderPage() {
                 </p>
               )}
               {isImpersonating && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Disabled in admin preview mode
+                <p className="text-xs text-amber-700 dark:text-amber-400 text-center">
+                  This order will be placed on behalf of{" "}
+                  <strong>{impersonatedName ?? "this customer"}</strong> —
+                  they&apos;ll receive the Square invoice.
                 </p>
               )}
             </CardContent>

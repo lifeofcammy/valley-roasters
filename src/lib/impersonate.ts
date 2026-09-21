@@ -151,7 +151,13 @@ export async function getEffectiveProfile(): Promise<EffectiveProfileResult> {
  * to refuse writes for ANY session that has the cookie set, which
  * is the safer default.
  */
+/**
+ * True only when the caller is an admin who is currently viewing as a
+ * customer. A leftover cookie in a browser where a real customer has
+ * since signed in does not count — the customer must be able to order.
+ */
 export async function isImpersonatingFromCookie(): Promise<boolean> {
   const cookieStore = await cookies();
-  return Boolean(cookieStore.get(IMPERSONATE_COOKIE)?.value);
+  if (!cookieStore.get(IMPERSONATE_COOKIE)?.value) return false;
+  return (await getEffectiveProfile()).isImpersonating;
 }
