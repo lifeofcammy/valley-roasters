@@ -94,6 +94,65 @@ function unitTotalCents(item: CartItem): number {
   return item.unit_price_cents + (item.grind?.price_cents ?? 0);
 }
 
+/**
+ * Re-price catalog-backed rows from Square. Runs on every load so a cart
+ * saved yesterday reflects today's Square prices — and so a cart saved
+ * before grind upcharges were tracked picks them up instead of showing
+ * +$0 when the buyer switches grinds. Rows Square no longer knows about
+ * are left untouched; the server re-checks everything at checkout.
+ */
+async function refreshFromCatalog(rows: CartItem[]): Promise<CartItem[]> {
+  return Promise.all(
+    rows.map(async (row) => {
+      if (!row.catalog_item_id) return row;
+      try {
+        const res = await fetch(
+          `/api/portal/catalog-item?id=${encodeURIComponent(row.catalog_item_id)}`,
+          { credentials: "include" }
+        );
+        if (!res.ok) return row;
+        const { item } = (await res.json()) as {
+          item?: {
+            variations: Array<{ id: string; name: string; price_cents: number }>;
+            grind_options?: Array<{ id: string; name: string; price_cents: number }>;
+          };
+        };
+        if (!item) return row;
+
+        const sizes = item.variations.map((v) => ({
+          id: v.id,
+          name: v.name,
+          price_cents: v.price_cents,
+        }));
+        const size =
+          sizes.find((v) => v.id === row.size_variation_id) ??
+          sizes.find((v) => v.name === row.size) ??
+          sizes[0];
+        const grinds = (item.grind_options ?? []).map((g) => ({
+          id: g.id,
+          name: g.name,
+          price_cents: g.price_cents ?? 0,
+        }));
+        const grind = row.grind
+          ? grinds.find((g) => g.id === row.grind?.id) ?? null
+          : null;
+
+        return {
+          ...row,
+          size: size?.name ?? row.size,
+          size_variation_id: size?.id ?? row.size_variation_id,
+          unit_price_cents: size?.price_cents ?? row.unit_price_cents,
+          size_options: sizes,
+          grind_options: grinds,
+          grind,
+        };
+      } catch {
+        return row;
+      }
+    })
+  );
+}
+
 /** Add a catalog row, bumping quantity if the same item/size/grind is already there. */
 function mergeIntoCart(cart: CartItem[], row: CartItem): CartItem[] {
   const i = cart.findIndex(
@@ -169,8 +228,11 @@ export default function ReorderPage() {
       if (!user) return;
       setUserId(user.id);
 
-      // Start from whatever they had in the cart last time.
-      let nextCart: CartItem[] = readStoredCart(user.id);
+      // Start from whatever they had in the cart last time, re-priced
+      // against Square so nothing stale reaches the order summary.
+      let nextCart: CartItem[] = await refreshFromCatalog(
+        readStoredCart(user.id)
+      );
 
       // Buyer rules: credit hold + delivery policy. Surfaces an
       // outstanding invoice before they bother building a cart, and lets
