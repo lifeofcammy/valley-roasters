@@ -36,6 +36,7 @@ import {
   isSquareConfigured,
 } from "@/lib/square/client";
 import { format } from "date-fns";
+import { formatGrind } from "@/lib/square/client";
 
 async function assertAdmin() {
   const s = await createClient();
@@ -47,10 +48,7 @@ async function assertAdmin() {
 
 /** "Cold Brew (+$1.25)", "Whole Bean", or "—" for items that aren't ground. */
 function grindLabel(grind: { name: string; price_cents: number } | null): string {
-  if (!grind) return "—";
-  return grind.price_cents > 0
-    ? `${grind.name} (+$${(grind.price_cents / 100).toFixed(2)})`
-    : grind.name;
+  return formatGrind(grind) ?? "—";
 }
 
 export default async function AdminOrderDetailPage({

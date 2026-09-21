@@ -92,12 +92,36 @@ export type SquareLineItem = {
  * without the prefix.
  */
 export function lineItemGrindName(li: SquareLineItem): string | null {
+  return lineItemGrind(li)?.name ?? null;
+}
+
+/** Same, with the upcharge Square applied (0 for a note-only legacy line). */
+export function lineItemGrind(
+  li: SquareLineItem
+): { name: string; price_cents: number } | null {
   const prefix = /^grind:\s*/i;
   for (const m of li.modifiers ?? []) {
-    if (m.name && prefix.test(m.name)) return m.name.replace(prefix, "").trim();
+    if (m.name && prefix.test(m.name)) {
+      return {
+        name: m.name.replace(prefix, "").trim(),
+        price_cents: m.base_price_money?.amount ?? 0,
+      };
+    }
   }
-  if (li.note && prefix.test(li.note)) return li.note.replace(prefix, "").trim();
+  if (li.note && prefix.test(li.note)) {
+    return { name: li.note.replace(prefix, "").trim(), price_cents: 0 };
+  }
   return null;
+}
+
+/** "Espresso (+$1.25)" or "Whole Bean" — how a grind reads on an order page. */
+export function formatGrind(
+  grind: { name: string; price_cents: number } | null | undefined
+): string | undefined {
+  if (!grind) return undefined;
+  return grind.price_cents > 0
+    ? `${grind.name} (+$${(grind.price_cents / 100).toFixed(2)})`
+    : grind.name;
 }
 
 export type SquareOrder = {

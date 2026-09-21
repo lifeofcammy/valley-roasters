@@ -19,7 +19,8 @@ import { format } from "date-fns";
 import {
   fetchOrderForCustomer,
   isSquareConfigured,
-  lineItemGrindName,
+  formatGrind,
+  lineItemGrind,
   moneyToDollars,
   squareStateToStatus,
 } from "@/lib/square/client";
@@ -118,7 +119,7 @@ export default async function OrderDetailPage({
             return {
               id: li.uid ?? `line-${idx}`,
               name: li.name ?? "Item",
-              grind: lineItemGrindName(li) ?? undefined,
+              grind: formatGrind(lineItemGrind(li)),
               quantity: qty,
               unit_price_cents: Math.round(unit * 100),
               total_cents: Math.round(total * 100),
@@ -151,7 +152,7 @@ export default async function OrderDetailPage({
       quantity: number;
       unit_price_cents: number;
       total_cents: number;
-      grind: { name: string } | null;
+      grind: { name: string; price_cents: number } | null;
     };
 
     order = {
@@ -168,7 +169,7 @@ export default async function OrderDetailPage({
       items: ((data.order_items as RawItem[] | null) ?? []).map((it) => ({
         id: String(it.id),
         name: it.product_name,
-        grind: it.grind?.name,
+        grind: formatGrind(it.grind),
         quantity: it.quantity,
         unit_price_cents: it.unit_price_cents,
         total_cents: it.total_cents,
